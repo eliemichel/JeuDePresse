@@ -1,5 +1,3 @@
-[https://eliemichel.github.io/JeuDePresse](< Tous les jeux)
-
 Robert
 ======
 

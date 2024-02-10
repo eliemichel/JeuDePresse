@@ -38,7 +38,7 @@ const config = {
 		},
 	},
 	gravity: 0.1,
-	aboutUrl: "http://localhost:8001",
+	aboutUrl: "https://eliemichel.github.io/JeuDePresse/001-Robert/about",
 
 	// == DEBUG ==
 	countDownDelay: 1000,
