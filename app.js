@@ -1,0 +1,659 @@
+const config = {
+	startScene: 'MENU',
+	characterSpeed: 3,
+	fallSpeed: 1,
+	width: 380,
+	height: 720,
+	ennemySpawn: {
+		distance: 120,
+	},
+	countDownDelay: 1000, // ms between each number
+	pixelPerfect: false,
+	deathAnim: {
+		initialVelocity: {
+			x: 1.5,
+			y: -3,
+		},
+		rotationVelocity: 2,
+		duration: 1000,
+	},
+	gravity: 0.1,
+	aboutUrl: "http://localhost:8001",
+
+	// == DEBUG ==
+	countDownDelay: 200,
+	startScene: 'MENU',
+	// ==  ==
+};
+
+// Use this any time you set the size/position of a DOM element
+config.domPixelMultiplier = config.pixelPerfect ? 1.0 / window.devicePixelRatio : 1.0;
+
+const zip = (...rows) => [...rows[0]].map((_,c) => rows.map(row => row[c]));
+
+function wait(ms) {
+	return new Promise(resolve => { setTimeout(resolve, ms); });
+}
+
+function fetchImage(url) {
+	return new Promise(resolve => {
+		const img = new Image();
+		img.addEventListener("load", e => resolve(img));
+		img.src = url;
+	});
+}
+
+function replaceColorByAlpha(image, color) {
+	if (!color) return image;
+	const tmpCanvas = document.createElement('canvas');
+	tmpCanvas.width = image.width;
+	tmpCanvas.height = image.height;
+	const ctx = tmpCanvas.getContext("2d");
+	ctx.drawImage(image, 0, 0);
+	const imageData = ctx.getImageData(0, 0, image.width, image.height);
+	for (let i = 0 ; i < imageData.data.length ; i += 4) {
+		if (
+			imageData.data[i + 0] == color[0] &&
+			imageData.data[i + 1] == color[1] &&
+			imageData.data[i + 2] == color[2]
+		) {
+			imageData.data[i + 3] = 0;
+		}
+	}
+	ctx.putImageData(imageData, 0, 0);
+	return tmpCanvas;
+}
+
+function bboxOffset(bbox, x, y) {
+	return {
+		minx: bbox.minx + x,
+		miny: bbox.miny + y,
+		maxx: bbox.maxx + x,
+		maxy: bbox.maxy + y,
+	};
+}
+
+function bboxFromImage(img, x, y) {
+	return {
+		minx: x,
+		miny: y,
+		maxx: x + img.width,
+		maxy: y + img.height,
+	};
+}
+
+function bboxIntersection(a, b) {
+	return {
+		minx: Math.max(a.minx, b.minx),
+		maxx: Math.min(a.maxx, b.maxx),
+		miny: Math.max(a.miny, b.miny),
+		maxy: Math.min(a.maxy, b.maxy),
+	}
+}
+
+// BBox of the non-transparent content of the image
+function computeImageContentBBox(canvas) {
+	const bbox = {
+		minx: 0,
+		miny: 0,
+		maxx: -1,
+		maxy: -1,
+	};
+	const ctx = canvas.getContext("2d");
+	const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+	for (let i = 0 ; i < imageData.data.length ; i += 4) {
+		if (imageData.data[i + 3] > 0) {
+			const x = (i / 4) % canvas.width;
+			const y = Math.floor((i / 4) / canvas.width);
+			if (bbox.maxx == -1) {
+				bbox.minx = x;
+				bbox.miny = y;
+				bbox.maxx = x + 1;
+				bbox.maxy = y + 1;
+			} else {
+				bbox.minx = Math.min(x, bbox.minx);
+				bbox.miny = Math.min(y, bbox.miny);
+				bbox.maxx = Math.max(x + 1, bbox.maxx);
+				bbox.maxy = Math.max(y + 1, bbox.maxy);
+			}
+		}
+	}
+
+	return bbox;
+}
+
+function isOpaqueAt(canvas, position) {
+	const { x, y } = position;
+	if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) return false;
+	return canvas.getContext("2d").getImageData(x, y, 1, 1).data[3] > 0
+}
+
+function bboxIsEmpty(bbox) {
+	return (
+		(bbox.maxx - bbox.minx) <= 0.0 ||
+		(bbox.maxy - bbox.miny) <= 0.0
+	);
+}
+
+function bboxStroke(ctx, bbox) {
+	ctx.strokeRect(
+		bbox.minx + 0.5,
+		bbox.miny + 0.5,
+		bbox.maxx - bbox.minx,
+		bbox.maxy - bbox.miny,
+	);
+}
+
+class App {
+	constructor() {
+		this.state = {
+			needRedraw: true,
+			scene: 'MENU', // of [ 'MENU', 'GAME', 'END' ]
+			ennemies: [
+				// { x, y }
+			],
+			character: {
+				position: { x: config.width / 2, y: 600 },
+				velocity: { x: 0, y: 0 },
+				rotation: 0,
+				movingRight: false,
+				movingLeft: false,
+			},
+			countDown: 0,
+			idDead: false,
+			drag: {
+				active: false,
+				startCharacterPosition: { x: 0 },
+				startPosition: { x: 0 },
+			},
+		};
+		this.assets = {
+			images: {},
+			bboxes: {},
+		};
+		this.dom = {};
+
+		const $dom = new Promise(resolve => {
+			document.addEventListener("DOMContentLoaded", resolve());
+		}).then(this.onDomContentLoaded.bind(this));
+
+		document.addEventListener("keydown", this.onKeyDown.bind(this));
+		document.addEventListener("keyup", this.onKeyUp.bind(this));
+		document.addEventListener("touchstart", this.onTouchStart.bind(this));
+		document.addEventListener("touchend", this.onTouchEnd.bind(this));
+		document.addEventListener("touchmove", this.onTouchMove.bind(this));
+		document.addEventListener("touchcancel", this.onTouchCancel.bind(this));
+		document.addEventListener("mousedown", this.onMouseDown.bind(this));
+		document.addEventListener("mouseup", this.onMouseUp.bind(this));
+		document.addEventListener("mousemove", this.onMouseMove.bind(this));
+		document.addEventListener("mouseenter", this.onMouseEnter.bind(this));
+
+		const $images = this.loadImages();
+
+		Promise.all([
+			$dom,
+			$images,
+		]).then(() => {
+			this.start();
+		})
+	}
+
+	onKeyDown(ev) {
+		const { character } = this.state;
+		if (ev.key == 'ArrowRight') {
+			character.movingRight = true;
+		}
+		if (ev.key == 'ArrowLeft') {
+			character.movingLeft = true;
+		}
+	}
+
+	onKeyUp(ev) {
+		const { character } = this.state;
+		if (ev.key == 'ArrowRight') {
+			character.movingRight = false;
+		}
+		if (ev.key == 'ArrowLeft') {
+			character.movingLeft = false;
+		}
+	}
+
+	onMouseDown(ev) {
+		if (ev.button == 0 && this.state.scene == 'GAME') {
+			this.startDragging({ x: ev.clientX, y: ev.clientY });
+		}
+	}
+
+	onMouseMove(ev) {
+		this.updateDragging({ x: ev.clientX, y: ev.clientY });
+	}
+
+	onMouseUp(ev) {
+		if (ev.button == 0) {
+			this.stopDragging();
+		}
+	}
+
+	onMouseEnter(ev) {
+		if (!ev.buttons.includes(0)) {
+			this.stopDragging();
+		}
+	}
+
+	onTouchStart(ev) {
+		this.startDragging({ x: ev.touches[0].clientX, y: ev.touches[0].clientY });
+	}
+
+	onTouchEnd(ev) {
+		this.stopDragging();
+	}
+
+	onTouchMove(ev) {
+		this.updateDragging({ x: ev.touches[0].clientX, y: ev.touches[0].clientY });
+	}
+
+	onTouchCancel(ev) {
+		this.cancelDragging({ x: ev.touches[0].clientX, y: ev.touches[0].clientY });
+	}
+
+
+	startDragging(position) {
+		const { drag, character } = this.state;
+		drag.active = true;
+		drag.startCharacterPosition.x = character.position.x;
+		drag.startPosition.x = position.x;
+	}
+
+	updateDragging(position) {
+		const { drag, character } = this.state;
+		if (!drag.active) return;
+		const deltaX = position.x - drag.startPosition.x;
+		character.position.x = drag.startCharacterPosition.x + deltaX;
+		character.position.x = Math.min(Math.max(0, character.position.x), config.width);
+	}
+
+	stopDragging() {
+		const { drag, character } = this.state;
+		drag.active = false;
+	}
+
+	cancelDragging() {
+		const { drag, character } = this.state;
+		drag.active = false;
+		character.position.x = drag.startCharacterPosition.x;
+	}
+
+	loadImages() {
+		const imageInfo = [
+			{ name: "background", background: null },
+			{ name: "play", background: [255, 174, 201] },
+			{ name: "playHover", background: [255, 174, 201] },
+			{ name: "playPressed", background: [255, 174, 201] },
+			{ name: "back", background: [255, 174, 201] },
+			{ name: "backHover", background: [255, 174, 201] },
+			{ name: "backPressed", background: [255, 174, 201] },
+			{ name: "E", background: [255, 174, 201] },
+			{ name: "EHover", background: [255, 174, 201] },
+			{ name: "EPressed", background: [255, 174, 201] },
+			{ name: "guillotine", background: [255, 174, 201], computeContentBBox: true },
+			{ name: "guillotineLarge", background: [255, 174, 201] },
+			{ name: "character", background: [255, 174, 201] },
+			{ name: "robert", background: [255, 174, 201] },
+			{ name: "menuTitle", background: [255, 174, 201] },
+			{ name: "1", background: [255, 174, 201] },
+			{ name: "2", background: [255, 174, 201] },
+			{ name: "3", background: [255, 174, 201] },
+			{ name: "gameover", background: [255, 174, 201] },
+		]
+		return Promise.all(
+			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
+		).then(loadedImages => {
+			const { images, bboxes } = this.assets;
+			for (const [image, entry] of zip(loadedImages, imageInfo)) {
+				images[entry.name] = replaceColorByAlpha(image, entry.background);
+				if (entry.computeContentBBox) {
+					bboxes[entry.name] = computeImageContentBBox(images[entry.name]); 
+				}
+			}
+		});
+	}
+
+	onDomContentLoaded() {
+		this.dom = {
+			"main": document.getElementById("main"),
+			"canvas": document.getElementById("canvas"),
+			"play-btn": document.getElementById("play-btn"),
+			"play-btn-img": document.getElementById("play-btn-img"),
+			"back-btn": document.getElementById("back-btn"),
+			"back-btn-img": document.getElementById("back-btn-img"),
+			"E-btn": document.getElementById("E-btn"),
+			"E-btn-img": document.getElementById("E-btn-img"),
+		};
+
+		if (config.pixelPerfect) {
+			this.dom.canvas.width = config.width;
+			this.dom.canvas.height = config.height;
+			this.dom.canvas.style.width = `${config.width * config.domPixelMultiplier}px`;
+			this.dom.canvas.style.height = `${config.height * config.domPixelMultiplier}px`;
+			this.dom.main.style.width = `${config.width * config.domPixelMultiplier}px`;
+			this.dom.main.style.height = `${config.height * config.domPixelMultiplier}px`;
+		} else {
+			this.dom.canvas.width = this.dom.canvas.clientWidth;
+			this.dom.canvas.height = this.dom.canvas.clientHeight;
+		}
+
+		this.context2d = this.dom.canvas.getContext("2d");
+		this.context2d.imageSmoothingEnabled = false;
+
+		this.dom["play-btn"].addEventListener("click", e => {
+			this.setScene('GAME');
+		});
+
+		this.dom["back-btn"].addEventListener("click", e => {
+			this.setScene('MENU');
+		});
+
+		this.dom["E-btn"].addEventListener("click", e => {
+			window.open(config.aboutUrl, '_blank');
+		});
+	}
+
+	start() {
+		const { images } = this.assets;
+		function setButtonImage(element, image) {
+			element.src = image.toDataURL();
+			element.style.width = `${image.width * config.domPixelMultiplier}px`;
+			element.style.height = `${image.height * config.domPixelMultiplier}px`;	
+		}
+
+		function setupButton(args) {
+			const {
+				buttonElement,
+				imageElement,
+				images,
+				placement
+			} = args;
+			setButtonImage(imageElement, images.default);
+			if (images.hover) {
+				buttonElement.addEventListener("mouseenter", e => {
+					setButtonImage(imageElement, images.hover);
+				});
+				buttonElement.addEventListener("mouseleave", e => {
+					setButtonImage(imageElement, images.default);
+				});
+			}
+			if (images.pressed) {
+				buttonElement.addEventListener("mousedown", e => {
+					setButtonImage(imageElement, images.pressed);
+				});
+				buttonElement.addEventListener("mouseup", e => {
+					setButtonImage(imageElement, images.default);
+				});
+			}
+			const style = buttonElement.style;
+			style.display = 'none';
+			style.position = 'absolute';
+			for (const [key, value] of Object.entries(placement)) {
+				style[key] = `${value * config.domPixelMultiplier}px`;
+			}
+		}
+
+		const autoSetupButton = (name, placement) => {
+			setupButton({
+				buttonElement: this.dom[`${name}-btn`],
+				imageElement: this.dom[`${name}-btn-img`],
+				images: {
+					default: images[name],
+					hover: images[`${name}Hover`],
+					pressed: images[`${name}Pressed`],
+				},
+				placement
+			});
+		}
+
+		autoSetupButton("play", {
+			top: 240,
+			right: 30
+		});
+		autoSetupButton("back", {
+			top: 0,
+			left: 0
+		});
+		autoSetupButton("E", {
+			bottom: 0,
+			left: 0
+		});
+
+		this.setScene(config.startScene);
+		requestAnimationFrame(this.onFrame.bind(this));
+	}
+
+	startMenu() {
+		this.dom["play-btn"].style.display = 'block';
+		this.dom["E-btn"].style.display = 'block';
+	}
+
+	stopMenu() {
+		this.dom["play-btn"].style.display = 'none';
+		this.dom["E-btn"].style.display = 'none';
+	}
+
+	startGame() {
+		this.state.ennemies = [];
+		this.state.isDead = false;
+		this.state.character.position = { x: config.width / 2, y: 600 };
+		this.state.character.rotation = 0;
+		this.startCountDown();
+	}
+
+	stopGame() {
+
+	}
+
+	startEnd() {
+		this.dom["back-btn"].style.display = 'block';
+	}
+
+	stopEnd() {
+		this.dom["back-btn"].style.display = 'none';
+	}
+
+	startCountDown() {
+		const { state } = this;
+		state.countDown = 3;
+		state.needRedraw = true;
+
+		wait(config.countDownDelay)
+		.then(() => {
+			state.countDown = 2;
+			state.needRedraw = true;
+			return wait(config.countDownDelay);
+		})
+		.then(() => {
+			state.countDown = 1;
+			state.needRedraw = true;
+			return wait(config.countDownDelay);
+		})
+		.then(() => {
+			state.countDown = 0;
+			state.needRedraw = true;
+		});
+	}
+
+	startGameOver() {
+		const { state } = this;
+		const { character } = state;
+		state.isDead = true;
+		character.velocity = {
+			x: (character.movingRight ? 1 : character.movingLeft ? -1 : 0) * config.deathAnim.initialVelocity.x,
+			y: config.deathAnim.initialVelocity.y,
+		}
+		wait(config.deathAnim.duration)
+		.then(() => {
+			this.setScene('END');
+		})
+	}
+
+	setScene(newScene) {
+		const { state } = this;
+		switch (state.scene) {
+		case 'MENU':
+			this.stopMenu();
+			break;
+		case 'GAME':
+			this.stopGame();
+			break;
+		case 'END':
+			this.stopEnd();
+			break;
+		default:
+			console.error(`Invalid scene ID: '${newScene}'`);
+			return;
+		}
+		switch (newScene) {
+		case 'MENU':
+			this.startMenu();
+			break;
+		case 'GAME':
+			this.startGame();
+			break;
+		case 'END':
+			this.startEnd();
+			break;
+		default:
+			console.error(`Invalid scene ID: '${newScene}'`);
+			return;
+		}
+		state.scene = newScene;
+		state.needRedraw = true;
+	}
+
+	onFrame() {
+		switch (this.state.scene) {
+		case 'MENU':
+			break;
+		case 'GAME':
+			this.updateGame();
+			break;
+		case 'END':
+			break;
+		}
+
+		if (this.state.needRedraw) {
+			this.draw();
+		}
+		this.state.needRedraw = false;
+		requestAnimationFrame(this.onFrame.bind(this));
+	}
+
+	updateGame() {
+		const { state } = this;
+		const { images, bboxes } = this.assets;
+		const { ennemies, character } = state;
+
+		// Ennemy update
+		if (state.countDown == 0) {
+			for (const en of ennemies) {
+				en.y += config.fallSpeed;
+			}
+			if (ennemies.length == 0 || ennemies.at(-1).y > config.ennemySpawn.distance) {
+				const img = images.guillotine;
+				const x = Math.floor(Math.random() * (config.width - img.width));
+				const y = -img.height;
+				ennemies.push({ x, y });
+			}
+			state.ennemies = state.ennemies.filter(en => en.y < config.height);
+		}
+
+		// Character update
+		if (state.isDead) {
+			const dt = 1;
+			character.position.x += character.velocity.x * dt;
+			character.position.y += character.velocity.y * dt;
+			character.velocity.y += config.gravity * dt;
+			character.rotation += config.deathAnim.rotationVelocity;
+		} else {
+			if (character.movingRight) {
+				character.position.x += config.characterSpeed;
+			}
+			if (character.movingLeft) {
+				character.position.x -= config.characterSpeed;
+			}
+			character.position.x = Math.min(Math.max(0, character.position.x), config.width);
+		}
+
+		// Collision detection
+		if (!state.isDead) {
+			for (const en of ennemies) {
+				if (!bboxIsEmpty(bboxIntersection(
+					bboxOffset(bboxes.guillotine, en.x, en.y),
+					bboxFromImage(images.character, character.position.x - images.character.width / 2, character.position.y)
+				))) {
+					const x = character.position.x - images.character.width / 2;
+					const y = character.position.y;
+					const lowerLeft = {
+						x: en.x + bboxes.guillotine.minx - x,
+						y: en.y + bboxes.guillotine.maxy - y,
+					};
+					const lowerMiddle = {
+						x: en.x + (bboxes.guillotine.minx + bboxes.guillotine.maxx) / 2 - x,
+						y: en.y + bboxes.guillotine.maxy - y,
+					};
+					const lowerRight = {
+						x: en.x + bboxes.guillotine.maxx - x,
+						y: en.y + bboxes.guillotine.maxy - y,
+					};
+					const lowerLeftHit = isOpaqueAt(images.character, lowerLeft);
+					const lowerMiddleHit = isOpaqueAt(images.character, lowerMiddle);
+					const lowerRightHit = isOpaqueAt(images.character, lowerRight);
+					if (lowerLeftHit || lowerMiddleHit || lowerRightHit) {
+						this.startGameOver();
+					}
+				}
+			}
+		}
+
+		state.needRedraw = true;
+	}
+
+	draw() {
+		const { state } = this;
+		const { scene, ennemies, character, countDown } = state;
+		const { images, bboxes } = this.assets;
+		const ctx = this.context2d;
+
+		ctx.drawImage(images.background, 0, 0);
+
+		switch (scene) {
+		case 'MENU':
+			ctx.drawImage(images.robert, 0, 0);
+			ctx.drawImage(images.guillotineLarge, 0, 0);
+			ctx.drawImage(images.menuTitle, 0, 0);
+			break;
+		case 'GAME':
+			if (countDown > 0) {
+				const img = images[String(countDown)];
+				ctx.drawImage(img, (config.width - img.width) / 2, (config.height - img.height) / 2);
+			}
+			for (const en of ennemies) {
+				ctx.drawImage(images.guillotine, en.x, en.y);
+			}
+
+			// Character
+			ctx.save();
+			
+			ctx.translate(character.position.x, character.position.y + images.character.height / 2);
+			ctx.rotate(character.rotation * Math.PI / 180);
+			ctx.translate(-character.position.x, -(character.position.y + images.character.height / 2));
+
+			ctx.drawImage(images.character, character.position.x - images.character.width / 2, character.position.y);
+			ctx.restore();
+			break;
+		case 'END':
+			ctx.drawImage(images.gameover, 0, 0);
+			break;
+		}
+	}
+}
+
+app = new App();
