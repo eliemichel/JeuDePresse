@@ -8,20 +8,40 @@ const config = {
 		distance: 120,
 	},
 	countDownDelay: 1000, // ms between each number
-	pixelPerfect: false,
-	deathAnim: {
-		initialVelocity: {
-			x: 1.5,
-			y: -3,
+	pixelPerfect: false, // display in the exact 380x720 resolution, whichever the window size and pixel density
+	anim: {
+		death: {
+			initialVelocity: {
+				x: 1.5,
+				y: -3,
+			},
+			rotationVelocity: 2,
+			duration: 1000,
 		},
-		rotationVelocity: 2,
-		duration: 1000,
+		robert: {
+			start: 2000,
+			wait: {
+				min: 3000,
+				max: 8000,
+			},
+		},
+		guillotine: {
+			start: 3000,
+			wait: {
+				min: 3000,
+				max: 8000,
+			},
+		},
+		transitionToGame: {
+			duration: 900,
+			speed: 400,
+		},
 	},
 	gravity: 0.1,
 	aboutUrl: "http://localhost:8001",
 
 	// == DEBUG ==
-	countDownDelay: 200,
+	countDownDelay: 1000,
 	startScene: 'MENU',
 	// ==  ==
 };
@@ -144,6 +164,44 @@ function bboxStroke(ctx, bbox) {
 	);
 }
 
+function setButtonImage(element, image) {
+	element.src = image.toDataURL();
+	element.style.width = `${image.width * config.domPixelMultiplier}em`;
+	element.style.height = `${image.height * config.domPixelMultiplier}em`;	
+}
+
+function setupButton(args) {
+	const {
+		buttonElement,
+		imageElement,
+		images,
+		placement
+	} = args;
+	setButtonImage(imageElement, images.default);
+	if (images.hover) {
+		buttonElement.addEventListener("mouseenter", e => {
+			setButtonImage(imageElement, images.hover);
+		});
+		buttonElement.addEventListener("mouseleave", e => {
+			setButtonImage(imageElement, images.default);
+		});
+	}
+	if (images.pressed) {
+		buttonElement.addEventListener("mousedown", e => {
+			setButtonImage(imageElement, images.pressed);
+		});
+		buttonElement.addEventListener("mouseup", e => {
+			setButtonImage(imageElement, images.default);
+		});
+	}
+	const style = buttonElement.style;
+	style.display = 'none';
+	style.position = 'absolute';
+	for (const [key, value] of Object.entries(placement)) {
+		style[key] = `${value * config.domPixelMultiplier}em`;
+	}
+}
+
 class App {
 	constructor() {
 		this.state = {
@@ -166,6 +224,9 @@ class App {
 				startCharacterPosition: { x: 0 },
 				startPosition: { x: 0 },
 			},
+			robertFrame: 0,
+			guillotineFrame: 0,
+			transitionToGameStartTime: null,
 		};
 		this.assets = {
 			images: {},
@@ -177,17 +238,6 @@ class App {
 			document.addEventListener("DOMContentLoaded", resolve());
 		}).then(this.onDomContentLoaded.bind(this));
 
-		document.addEventListener("keydown", this.onKeyDown.bind(this));
-		document.addEventListener("keyup", this.onKeyUp.bind(this));
-		document.addEventListener("touchstart", this.onTouchStart.bind(this));
-		document.addEventListener("touchend", this.onTouchEnd.bind(this));
-		document.addEventListener("touchmove", this.onTouchMove.bind(this));
-		document.addEventListener("touchcancel", this.onTouchCancel.bind(this));
-		document.addEventListener("mousedown", this.onMouseDown.bind(this));
-		document.addEventListener("mouseup", this.onMouseUp.bind(this));
-		document.addEventListener("mousemove", this.onMouseMove.bind(this));
-		document.addEventListener("mouseenter", this.onMouseEnter.bind(this));
-
 		const $images = this.loadImages();
 
 		Promise.all([
@@ -196,6 +246,32 @@ class App {
 		]).then(() => {
 			this.start();
 		})
+	}
+
+	onResize() {
+		let width, height;
+		if (config.pixelPerfect) {
+			width = config.width * config.domPixelMultiplier;
+			height = config.height * config.domPixelMultiplier;
+		} else {
+			const ratio = config.width / config.height;
+			const heightFromWidth = window.innerWidth / ratio;
+			const widthFromHeight = window.innerHeight * ratio;
+			if (heightFromWidth > window.innerHeight) {
+				height = window.innerHeight;
+				width = widthFromHeight;
+			} else {
+				height = heightFromWidth;
+				width = window.innerWidth;
+			}
+		}
+
+		this.dom.canvas.style.width = `${width}px`;
+		this.dom.canvas.style.height = `${height}px`;
+		this.dom.main.style.width = `${width}px`;
+		this.dom.main.style.height = `${height}px`;
+		this.dom.main.style.top = `${(window.innerHeight - height) / 2}px`;
+		this.dom.main.style['font-size'] = `${width / (config.width * config.domPixelMultiplier)}px`; // scale definition of '1em'
 	}
 
 	onKeyDown(ev) {
@@ -289,6 +365,7 @@ class App {
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
 			{ name: "playPressed", background: [255, 174, 201] },
+			{ name: "playHighlight", background: [255, 174, 201] },
 			{ name: "back", background: [255, 174, 201] },
 			{ name: "backHover", background: [255, 174, 201] },
 			{ name: "backPressed", background: [255, 174, 201] },
@@ -296,9 +373,14 @@ class App {
 			{ name: "EHover", background: [255, 174, 201] },
 			{ name: "EPressed", background: [255, 174, 201] },
 			{ name: "guillotine", background: [255, 174, 201], computeContentBBox: true },
-			{ name: "guillotineLarge", background: [255, 174, 201] },
+			{ name: "guillotineLarge01", background: [255, 174, 201] },
+			{ name: "guillotineLarge02", background: [255, 174, 201] },
+			{ name: "guillotineLarge03", background: [255, 174, 201] },
+			{ name: "guillotineLarge04", background: [255, 174, 201] },
 			{ name: "character", background: [255, 174, 201] },
-			{ name: "robert", background: [255, 174, 201] },
+			{ name: "robert01", background: [255, 174, 201] },
+			{ name: "robert02", background: [255, 174, 201] },
+			{ name: "robert03", background: [255, 174, 201] },
 			{ name: "menuTitle", background: [255, 174, 201] },
 			{ name: "1", background: [255, 174, 201] },
 			{ name: "2", background: [255, 174, 201] },
@@ -329,24 +411,15 @@ class App {
 			"E-btn": document.getElementById("E-btn"),
 			"E-btn-img": document.getElementById("E-btn-img"),
 		};
+		this.dom.container = this.dom.main.parentElement;
 
-		if (config.pixelPerfect) {
-			this.dom.canvas.width = config.width;
-			this.dom.canvas.height = config.height;
-			this.dom.canvas.style.width = `${config.width * config.domPixelMultiplier}px`;
-			this.dom.canvas.style.height = `${config.height * config.domPixelMultiplier}px`;
-			this.dom.main.style.width = `${config.width * config.domPixelMultiplier}px`;
-			this.dom.main.style.height = `${config.height * config.domPixelMultiplier}px`;
-		} else {
-			this.dom.canvas.width = this.dom.canvas.clientWidth;
-			this.dom.canvas.height = this.dom.canvas.clientHeight;
-		}
-
+		this.dom.canvas.width = config.width;
+		this.dom.canvas.height = config.height;
 		this.context2d = this.dom.canvas.getContext("2d");
 		this.context2d.imageSmoothingEnabled = false;
 
 		this.dom["play-btn"].addEventListener("click", e => {
-			this.setScene('GAME');
+			this.startTransitionToGame();
 		});
 
 		this.dom["back-btn"].addEventListener("click", e => {
@@ -356,48 +429,23 @@ class App {
 		this.dom["E-btn"].addEventListener("click", e => {
 			window.open(config.aboutUrl, '_blank');
 		});
+
+		document.addEventListener("keydown", this.onKeyDown.bind(this));
+		document.addEventListener("keyup", this.onKeyUp.bind(this));
+		document.addEventListener("touchstart", this.onTouchStart.bind(this));
+		document.addEventListener("touchend", this.onTouchEnd.bind(this));
+		document.addEventListener("touchmove", this.onTouchMove.bind(this));
+		document.addEventListener("touchcancel", this.onTouchCancel.bind(this));
+		document.addEventListener("mousedown", this.onMouseDown.bind(this));
+		document.addEventListener("mouseup", this.onMouseUp.bind(this));
+		document.addEventListener("mousemove", this.onMouseMove.bind(this));
+		document.addEventListener("mouseenter", this.onMouseEnter.bind(this));
+		new ResizeObserver(this.onResize.bind(this)).observe(this.dom.container);
+		this.onResize();
 	}
 
 	start() {
 		const { images } = this.assets;
-		function setButtonImage(element, image) {
-			element.src = image.toDataURL();
-			element.style.width = `${image.width * config.domPixelMultiplier}px`;
-			element.style.height = `${image.height * config.domPixelMultiplier}px`;	
-		}
-
-		function setupButton(args) {
-			const {
-				buttonElement,
-				imageElement,
-				images,
-				placement
-			} = args;
-			setButtonImage(imageElement, images.default);
-			if (images.hover) {
-				buttonElement.addEventListener("mouseenter", e => {
-					setButtonImage(imageElement, images.hover);
-				});
-				buttonElement.addEventListener("mouseleave", e => {
-					setButtonImage(imageElement, images.default);
-				});
-			}
-			if (images.pressed) {
-				buttonElement.addEventListener("mousedown", e => {
-					setButtonImage(imageElement, images.pressed);
-				});
-				buttonElement.addEventListener("mouseup", e => {
-					setButtonImage(imageElement, images.default);
-				});
-			}
-			const style = buttonElement.style;
-			style.display = 'none';
-			style.position = 'absolute';
-			for (const [key, value] of Object.entries(placement)) {
-				style[key] = `${value * config.domPixelMultiplier}px`;
-			}
-		}
-
 		const autoSetupButton = (name, placement) => {
 			setupButton({
 				buttonElement: this.dom[`${name}-btn`],
@@ -424,11 +472,63 @@ class App {
 			left: 0
 		});
 
+		// Robert animation
+		const robertAnimation = () => {
+			wait(0.0)
+			.then(() => {
+				this.state.robertFrame = 2;
+				this.state.needRedraw = true;
+				return wait(50);
+			})
+			.then(() => {
+				this.state.robertFrame = 1;
+				this.state.needRedraw = true;
+				return wait(100);
+			})
+			.then(() => {
+				this.state.robertFrame = 0;
+				this.state.needRedraw = true;
+				const { min, max } = config.anim.robert.wait;
+				return wait(min + Math.random() * (max - min));
+			})
+			.then(robertAnimation);
+		}
+		wait(config.anim.robert.start).then(robertAnimation);
+
+		// Guillotine animation
+		const guillotineAnimation = () => {
+			wait(0.0)
+			.then(() => {
+				this.state.guillotineFrame = 1;
+				this.state.needRedraw = true;
+				return wait(100);
+			})
+			.then(() => {
+				this.state.guillotineFrame = 2;
+				this.state.needRedraw = true;
+				return wait(50);
+			})
+			.then(() => {
+				this.state.guillotineFrame = 3;
+				this.state.needRedraw = true;
+				return wait(1000);
+			})
+			.then(() => {
+				this.state.guillotineFrame = 0;
+				this.state.needRedraw = true;
+				const { min, max } = config.anim.guillotine.wait;
+				return wait(min + Math.random() * (max - min));
+			})
+			.then(guillotineAnimation);
+		}
+		wait(config.anim.guillotine.start).then(guillotineAnimation);
+
 		this.setScene(config.startScene);
 		requestAnimationFrame(this.onFrame.bind(this));
 	}
 
 	startMenu() {
+		this.state.transitionToGameStartTime = null;
 		this.dom["play-btn"].style.display = 'block';
 		this.dom["E-btn"].style.display = 'block';
 	}
@@ -436,6 +536,15 @@ class App {
 	stopMenu() {
 		this.dom["play-btn"].style.display = 'none';
 		this.dom["E-btn"].style.display = 'none';
+	}
+
+	startTransitionToGame() {
+		this.dom["play-btn"].style.display = 'none';
+		this.state.transitionToGameStartTime = performance.now();
+		wait(config.anim.transitionToGame.duration)
+		.then(() => {
+			this.setScene('GAME');
+		})
 	}
 
 	startGame() {
@@ -485,10 +594,10 @@ class App {
 		const { character } = state;
 		state.isDead = true;
 		character.velocity = {
-			x: (character.movingRight ? 1 : character.movingLeft ? -1 : 0) * config.deathAnim.initialVelocity.x,
-			y: config.deathAnim.initialVelocity.y,
+			x: (character.movingRight ? 1 : character.movingLeft ? -1 : 0) * config.anim.death.initialVelocity.x,
+			y: config.anim.death.initialVelocity.y,
 		}
-		wait(config.deathAnim.duration)
+		wait(config.anim.death.duration)
 		.then(() => {
 			this.setScene('END');
 		})
@@ -531,6 +640,7 @@ class App {
 	onFrame() {
 		switch (this.state.scene) {
 		case 'MENU':
+			this.updateMenu();
 			break;
 		case 'GAME':
 			this.updateGame();
@@ -544,6 +654,12 @@ class App {
 		}
 		this.state.needRedraw = false;
 		requestAnimationFrame(this.onFrame.bind(this));
+	}
+
+	updateMenu() {
+		if (this.state.transitionToGameStartTime != null) {
+			this.state.needRedraw = true;
+		}
 	}
 
 	updateGame() {
@@ -571,7 +687,7 @@ class App {
 			character.position.x += character.velocity.x * dt;
 			character.position.y += character.velocity.y * dt;
 			character.velocity.y += config.gravity * dt;
-			character.rotation += config.deathAnim.rotationVelocity;
+			character.rotation += config.anim.death.rotationVelocity;
 		} else {
 			if (character.movingRight) {
 				character.position.x += config.characterSpeed;
@@ -603,10 +719,15 @@ class App {
 						x: en.x + bboxes.guillotine.maxx - x,
 						y: en.y + bboxes.guillotine.maxy - y,
 					};
+					const upperMiddle = {
+						x: en.x + (bboxes.guillotine.minx + bboxes.guillotine.maxx) / 2 - x,
+						y: en.y + bboxes.guillotine.miny - y,
+					};
 					const lowerLeftHit = isOpaqueAt(images.character, lowerLeft);
 					const lowerMiddleHit = isOpaqueAt(images.character, lowerMiddle);
 					const lowerRightHit = isOpaqueAt(images.character, lowerRight);
-					if (lowerLeftHit || lowerMiddleHit || lowerRightHit) {
+					const upperRightHit = isOpaqueAt(images.character, upperMiddle);
+					if (lowerLeftHit || lowerMiddleHit || lowerRightHit || upperRightHit) {
 						this.startGameOver();
 					}
 				}
@@ -626,9 +747,21 @@ class App {
 
 		switch (scene) {
 		case 'MENU':
-			ctx.drawImage(images.robert, 0, 0);
-			ctx.drawImage(images.guillotineLarge, 0, 0);
-			ctx.drawImage(images.menuTitle, 0, 0);
+			const positions ={
+				robert: 0,
+				guillotine: 0,
+				menu: -90,
+			};
+			if (this.state.transitionToGameStartTime != null) {
+				const time = (performance.now() - this.state.transitionToGameStartTime) / 1000.0;
+				const speed = config.anim.transitionToGame.speed;
+				positions.robert = time * speed;
+				positions.guillotine = -time * speed;
+				positions.menu = -90-time * speed + speed * 0.5 * Math.sin(Math.PI * Math.exp(-time));
+			}
+			ctx.drawImage(images.menuTitle, 0, positions.menu);
+			ctx.drawImage(images[`robert0${state.robertFrame+1}`], positions.robert, 0);
+			ctx.drawImage(images[`guillotineLarge0${state.guillotineFrame+1}`], positions.guillotine, 0);
 			break;
 		case 'GAME':
 			if (countDown > 0) {
