@@ -69,6 +69,7 @@ function replaceColorByAlpha(image, color) {
 	tmpCanvas.width = image.width;
 	tmpCanvas.height = image.height;
 	const ctx = tmpCanvas.getContext("2d");
+	ctx.imageSmoothingEnabled = false;
 	ctx.drawImage(image, 0, 0);
 	const imageData = ctx.getImageData(0, 0, image.width, image.height);
 	for (let i = 0 ; i < imageData.data.length ; i += 4) {
