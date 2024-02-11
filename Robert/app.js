@@ -187,23 +187,33 @@ function setupButton(args) {
 		images,
 		placement
 	} = args;
+
 	setButtonImage(imageElement, images.default);
+	imageElement.dataset.hover = false;
+	imageElement.dataset.pressed = false;
+	
 	if (images.hover) {
 		buttonElement.addEventListener("mouseenter", e => {
 			setButtonImage(imageElement, images.hover);
+			imageElement.dataset.hover = true;
 		});
 		buttonElement.addEventListener("mouseleave", e => {
 			setButtonImage(imageElement, images.default);
+			imageElement.dataset.hover = false;
 		});
 	}
+	
 	if (images.pressed) {
 		buttonElement.addEventListener("mousedown", e => {
 			setButtonImage(imageElement, images.pressed);
+			imageElement.dataset.pressed = true;
 		});
 		buttonElement.addEventListener("mouseup", e => {
 			setButtonImage(imageElement, images.default);
+			imageElement.dataset.pressed = true;
 		});
 	}
+	
 	const style = buttonElement.style;
 	style.display = 'none';
 	style.position = 'absolute';
@@ -599,6 +609,21 @@ class App {
 			.then(guillotineAnimation);
 		}
 		wait(config.anim.guillotine.start).then(guillotineAnimation);
+
+		// Play button animation
+		const playButtonAnimation = async () => {
+			const element = this.dom["play-btn-img"];
+			if (element.dataset.hover != "true" && element.dataset.pressed != "true") {
+				setButtonImage(element, this.assets.images.playHighlight);
+			}
+			await wait(500);
+			if (element.dataset.hover != "true" && element.dataset.pressed != "true") {
+				setButtonImage(element, this.assets.images.play);
+			}
+			await wait(500);
+			playButtonAnimation();
+		}
+		playButtonAnimation();
 
 		this.setScene(config.startScene);
 		requestAnimationFrame(this.onFrame.bind(this));
