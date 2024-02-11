@@ -700,6 +700,7 @@ class App {
 	startGame() {
 		const { state } = this;
 		this.dom["discours-audio"].play();
+		this.dom["fullscreen-btn"].style.display = 'block';
 		state.ennemies = [];
 		state.lives = config.defaultLives;
 		this.restartGameAfterHit();
@@ -715,6 +716,7 @@ class App {
 
 	stopGame() {
 		this.dom["discours-audio"].pause();
+		this.dom["fullscreen-btn"].style.display = 'none';
 	}
 
 	startEnd() {

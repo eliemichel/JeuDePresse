@@ -57,13 +57,16 @@ canvas,
 	font-weight: normal;
 	margin: 0;
 }
-#about h2 a {
+#about a {
 	color: inherit;
 }
 #about p {
 	font-size: 1.1rem;
 	margin: 0;
 	margin-top: 1rem;
+}
+#about p a {
+	font-style: italic;
 }
 
 button {
