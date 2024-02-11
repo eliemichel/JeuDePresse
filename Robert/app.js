@@ -359,6 +359,7 @@ class App {
 			"fullscreen-btn",
 			"fullscreen-btn-img",
 			"about",
+			"discours-audio",
 		];
 		for (const name of elementNames) {
 			this.dom[name] = document.getElementById(name);
@@ -653,6 +654,7 @@ class App {
 
 	startGame() {
 		const { state } = this;
+		this.dom["discours-audio"].play();
 		state.ennemies = [];
 		state.lives = config.defaultLives;
 		this.restartGameAfterHit();
@@ -667,7 +669,7 @@ class App {
 	}
 
 	stopGame() {
-
+		this.dom["discours-audio"].pause();
 	}
 
 	startEnd() {
