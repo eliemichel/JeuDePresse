@@ -38,7 +38,7 @@ const config = {
 		},
 	},
 	gravity: 0.0025,
-	aboutUrl: "https://eliemichel.github.io/JeuDePresse/001-Robert/about",
+	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Robert/about",
 
 	// == DEBUG ==
 	countDownDelay: 1000,
