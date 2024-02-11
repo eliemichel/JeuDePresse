@@ -233,21 +233,146 @@ class App {
 		this.assets = {
 			images: {},
 			bboxes: {},
+			sounds: {},
 		};
 		this.dom = {};
+		this.audio = { context: null };
 
 		const $dom = new Promise(resolve => {
 			document.addEventListener("DOMContentLoaded", resolve());
 		}).then(this.onDomContentLoaded.bind(this));
 
 		const $images = this.loadImages();
+		const $audio = this.loadAudio();
 
 		Promise.all([
 			$dom,
 			$images,
+			$audio,
 		]).then(() => {
 			this.start();
 		})
+	}
+
+	loadImages() {
+		const imageInfo = [
+			{ name: "background", background: null },
+			{ name: "play", background: [255, 174, 201] },
+			{ name: "playHover", background: [255, 174, 201] },
+			{ name: "playPressed", background: [255, 174, 201] },
+			{ name: "playHighlight", background: [255, 174, 201] },
+			{ name: "back", background: [255, 174, 201] },
+			{ name: "backHover", background: [255, 174, 201] },
+			{ name: "backPressed", background: [255, 174, 201] },
+			{ name: "E", background: [255, 174, 201] },
+			{ name: "EHover", background: [255, 174, 201] },
+			{ name: "EPressed", background: [255, 174, 201] },
+			{ name: "guillotine", background: [255, 174, 201], computeContentBBox: true },
+			{ name: "guillotineLarge01", background: [255, 174, 201] },
+			{ name: "guillotineLarge02", background: [255, 174, 201] },
+			{ name: "guillotineLarge03", background: [255, 174, 201] },
+			{ name: "guillotineLarge04", background: [255, 174, 201] },
+			{ name: "character", background: [255, 174, 201] },
+			{ name: "robert01", background: [255, 174, 201] },
+			{ name: "robert02", background: [255, 174, 201] },
+			{ name: "robert03", background: [255, 174, 201] },
+			{ name: "menuTitle", background: [255, 174, 201] },
+			{ name: "1", background: [255, 174, 201] },
+			{ name: "2", background: [255, 174, 201] },
+			{ name: "3", background: [255, 174, 201] },
+			{ name: "gameover", background: [255, 174, 201] },
+			{ name: "fullscreen", background: [255, 174, 201] },
+			{ name: "fullscreenHover", background: [255, 174, 201] },
+		]
+		return Promise.all(
+			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
+		).then(loadedImages => {
+			const { images, bboxes } = this.assets;
+			for (const [image, entry] of zip(loadedImages, imageInfo)) {
+				images[entry.name] = replaceColorByAlpha(image, entry.background);
+				if (entry.computeContentBBox) {
+					bboxes[entry.name] = computeImageContentBBox(images[entry.name]); 
+				}
+			}
+		});
+	}
+
+	loadAudio() {
+		const { assets } = this;
+		const soundInfo = [
+			{ name: "guillotine01", type: "mp3" },
+			{ name: "guillotine02", type: "mp3" },
+			{ name: "guillotine03", type: "mp3" },
+		]
+
+		const audioCtx = new AudioContext();
+		this.audio.context = audioCtx;
+
+		return Promise.all(
+			soundInfo.map(async entry => {
+				const url = `sound/${entry.name}.${entry.type}`;
+				const response = await fetch(url);
+				const bytes = await response.arrayBuffer();
+				assets.sounds[entry.name] = await audioCtx.decodeAudioData(bytes);
+			})
+		);
+	}
+
+	onDomContentLoaded() {
+		const elementNames = [
+			"main",
+			"canvas",
+			"play-btn",
+			"play-btn-img",
+			"back-btn",
+			"back-btn-img",
+			"E-btn",
+			"E-btn-img",
+			"fullscreen-btn",
+			"fullscreen-btn-img",
+		];
+		for (const name of elementNames) {
+			this.dom[name] = document.getElementById(name);
+		}
+		this.dom.container = this.dom.main.parentElement;
+
+		this.dom.canvas.width = config.width;
+		this.dom.canvas.height = config.height;
+		this.context2d = this.dom.canvas.getContext("2d");
+		this.context2d.imageSmoothingEnabled = false;
+
+		this.dom["play-btn"].addEventListener("click", e => {
+			this.startTransitionToGame();
+		});
+
+		this.dom["back-btn"].addEventListener("click", e => {
+			this.setScene('MENU');
+		});
+
+		this.dom["E-btn"].addEventListener("click", e => {
+			window.open(config.aboutUrl, '_blank');
+		});
+
+		this.dom["fullscreen-btn"].addEventListener("click", e => {
+			if (document.fullscreenElement) {
+				document.exitFullscreen();
+			} else {
+				this.dom.container.requestFullscreen();
+			}
+		});
+
+		document.addEventListener("keydown", this.onKeyDown.bind(this));
+		document.addEventListener("keyup", this.onKeyUp.bind(this));
+		document.addEventListener("touchstart", this.onTouchStart.bind(this));
+		document.addEventListener("touchend", this.onTouchEnd.bind(this));
+		document.addEventListener("touchmove", this.onTouchMove.bind(this));
+		document.addEventListener("touchcancel", this.onTouchCancel.bind(this));
+		document.addEventListener("mousedown", this.onMouseDown.bind(this));
+		document.addEventListener("mouseup", this.onMouseUp.bind(this));
+		document.addEventListener("mousemove", this.onMouseMove.bind(this));
+		document.addEventListener("mouseenter", this.onMouseEnter.bind(this));
+		new ResizeObserver(this.onResize.bind(this)).observe(this.dom.container);
+		this.onResize();
 	}
 
 	onResize() {
@@ -361,108 +486,8 @@ class App {
 		character.position.x = drag.startCharacterPosition.x;
 	}
 
-	loadImages() {
-		const imageInfo = [
-			{ name: "background", background: null },
-			{ name: "play", background: [255, 174, 201] },
-			{ name: "playHover", background: [255, 174, 201] },
-			{ name: "playPressed", background: [255, 174, 201] },
-			{ name: "playHighlight", background: [255, 174, 201] },
-			{ name: "back", background: [255, 174, 201] },
-			{ name: "backHover", background: [255, 174, 201] },
-			{ name: "backPressed", background: [255, 174, 201] },
-			{ name: "E", background: [255, 174, 201] },
-			{ name: "EHover", background: [255, 174, 201] },
-			{ name: "EPressed", background: [255, 174, 201] },
-			{ name: "guillotine", background: [255, 174, 201], computeContentBBox: true },
-			{ name: "guillotineLarge01", background: [255, 174, 201] },
-			{ name: "guillotineLarge02", background: [255, 174, 201] },
-			{ name: "guillotineLarge03", background: [255, 174, 201] },
-			{ name: "guillotineLarge04", background: [255, 174, 201] },
-			{ name: "character", background: [255, 174, 201] },
-			{ name: "robert01", background: [255, 174, 201] },
-			{ name: "robert02", background: [255, 174, 201] },
-			{ name: "robert03", background: [255, 174, 201] },
-			{ name: "menuTitle", background: [255, 174, 201] },
-			{ name: "1", background: [255, 174, 201] },
-			{ name: "2", background: [255, 174, 201] },
-			{ name: "3", background: [255, 174, 201] },
-			{ name: "gameover", background: [255, 174, 201] },
-			{ name: "fullscreen", background: [255, 174, 201] },
-			{ name: "fullscreenHover", background: [255, 174, 201] },
-		]
-		return Promise.all(
-			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
-		).then(loadedImages => {
-			const { images, bboxes } = this.assets;
-			for (const [image, entry] of zip(loadedImages, imageInfo)) {
-				images[entry.name] = replaceColorByAlpha(image, entry.background);
-				if (entry.computeContentBBox) {
-					bboxes[entry.name] = computeImageContentBBox(images[entry.name]); 
-				}
-			}
-		});
-	}
-
-	onDomContentLoaded() {
-		const elementNames = [
-			"main",
-			"canvas",
-			"play-btn",
-			"play-btn-img",
-			"back-btn",
-			"back-btn-img",
-			"E-btn",
-			"E-btn-img",
-			"fullscreen-btn",
-			"fullscreen-btn-img",
-		];
-		for (const name of elementNames) {
-			this.dom[name] = document.getElementById(name);
-		}
-		this.dom.container = this.dom.main.parentElement;
-
-		this.dom.canvas.width = config.width;
-		this.dom.canvas.height = config.height;
-		this.context2d = this.dom.canvas.getContext("2d");
-		this.context2d.imageSmoothingEnabled = false;
-
-		this.dom["play-btn"].addEventListener("click", e => {
-			this.startTransitionToGame();
-		});
-
-		this.dom["back-btn"].addEventListener("click", e => {
-			this.setScene('MENU');
-		});
-
-		this.dom["E-btn"].addEventListener("click", e => {
-			window.open(config.aboutUrl, '_blank');
-		});
-
-		this.dom["fullscreen-btn"].addEventListener("click", e => {
-			if (document.fullscreenElement) {
-				document.exitFullscreen();
-			} else {
-				this.dom.container.requestFullscreen();
-			}
-		});
-
-		document.addEventListener("keydown", this.onKeyDown.bind(this));
-		document.addEventListener("keyup", this.onKeyUp.bind(this));
-		document.addEventListener("touchstart", this.onTouchStart.bind(this));
-		document.addEventListener("touchend", this.onTouchEnd.bind(this));
-		document.addEventListener("touchmove", this.onTouchMove.bind(this));
-		document.addEventListener("touchcancel", this.onTouchCancel.bind(this));
-		document.addEventListener("mousedown", this.onMouseDown.bind(this));
-		document.addEventListener("mouseup", this.onMouseUp.bind(this));
-		document.addEventListener("mousemove", this.onMouseMove.bind(this));
-		document.addEventListener("mouseenter", this.onMouseEnter.bind(this));
-		new ResizeObserver(this.onResize.bind(this)).observe(this.dom.container);
-		this.onResize();
-	}
-
 	start() {
-		const { images } = this.assets;
+		const { images, sounds } = this.assets;
 		const autoSetupButton = (name, placement) => {
 			setupButton({
 				buttonElement: this.dom[`${name}-btn`],
@@ -528,6 +553,10 @@ class App {
 			.then(() => {
 				this.state.guillotineFrame = 2;
 				this.state.needRedraw = true;
+				if (this.state.scene == 'MENU') {
+					const soundIndex = Math.floor(Math.random() * 3);
+					this.playSound(`guillotine0${soundIndex+1}`);
+				}
 				return wait(50);
 			})
 			.then(() => {
@@ -621,6 +650,8 @@ class App {
 			x: (character.movingRight ? 1 : character.movingLeft ? -1 : 0) * config.anim.death.initialVelocity.x,
 			y: config.anim.death.initialVelocity.y,
 		}
+		const soundIndex = Math.floor(Math.random() * 3);
+		this.playSound(`guillotine0${soundIndex+1}`);
 		wait(config.anim.death.duration)
 		.then(() => {
 			this.setScene('END');
@@ -763,6 +794,15 @@ class App {
 		}
 
 		state.needRedraw = true;
+	}
+
+	playSound(soundName, loop) {
+		const audioCtx = this.audio.context;
+		const source = audioCtx.createBufferSource();
+		source.buffer = this.assets.sounds[soundName];
+		source.connect(audioCtx.destination);
+		source.loop = !!loop;
+		source.start();
 	}
 
 	draw() {
