@@ -1,7 +1,7 @@
 const config = {
 	startScene: 'MENU',
-	characterSpeed: 3,
-	fallSpeed: 1,
+	characterSpeed: 0.75,
+	fallSpeed: 0.2,
 	width: 380,
 	height: 720,
 	ennemySpawn: {
@@ -12,8 +12,8 @@ const config = {
 	anim: {
 		death: {
 			initialVelocity: {
-				x: 1.5,
-				y: -3,
+				x: 0.25,
+				y: -0.5,
 			},
 			rotationVelocity: 2,
 			duration: 1000,
@@ -37,7 +37,7 @@ const config = {
 			speed: 400,
 		},
 	},
-	gravity: 0.1,
+	gravity: 0.0025,
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/001-Robert/about",
 
 	// == DEBUG ==
@@ -228,6 +228,7 @@ class App {
 			robertFrame: 0,
 			guillotineFrame: 0,
 			transitionToGameStartTime: null,
+			previousFrameTime: performance.now(),
 		};
 		this.assets = {
 			images: {},
@@ -661,21 +662,26 @@ class App {
 	}
 
 	onFrame() {
-		switch (this.state.scene) {
+		const { state } = this;
+		const frameTime = performance.now();
+		const deltaTime = frameTime - state.previousFrameTime;
+
+		switch (state.scene) {
 		case 'MENU':
-			this.updateMenu();
+			this.updateMenu(deltaTime);
 			break;
 		case 'GAME':
-			this.updateGame();
+			this.updateGame(deltaTime);
 			break;
 		case 'END':
 			break;
 		}
 
-		if (this.state.needRedraw) {
+		if (state.needRedraw) {
 			this.draw();
 		}
-		this.state.needRedraw = false;
+		state.needRedraw = false;
+		state.previousFrameTime = frameTime;
 		requestAnimationFrame(this.onFrame.bind(this));
 	}
 
@@ -685,7 +691,7 @@ class App {
 		}
 	}
 
-	updateGame() {
+	updateGame(dt) {
 		const { state } = this;
 		const { images, bboxes } = this.assets;
 		const { ennemies, character } = state;
@@ -693,7 +699,7 @@ class App {
 		// Ennemy update
 		if (state.countDown == 0) {
 			for (const en of ennemies) {
-				en.y += config.fallSpeed;
+				en.y += config.fallSpeed * dt;
 			}
 			if (ennemies.length == 0 || ennemies.at(-1).y > config.ennemySpawn.distance) {
 				const img = images.guillotine;
@@ -706,17 +712,16 @@ class App {
 
 		// Character update
 		if (state.isDead) {
-			const dt = 1;
 			character.position.x += character.velocity.x * dt;
 			character.position.y += character.velocity.y * dt;
 			character.velocity.y += config.gravity * dt;
 			character.rotation += config.anim.death.rotationVelocity;
 		} else {
 			if (character.movingRight) {
-				character.position.x += config.characterSpeed;
+				character.position.x += config.characterSpeed * dt;
 			}
 			if (character.movingLeft) {
-				character.position.x -= config.characterSpeed;
+				character.position.x -= config.characterSpeed * dt;
 			}
 			character.position.x = Math.min(Math.max(0, character.position.x), config.width);
 		}
