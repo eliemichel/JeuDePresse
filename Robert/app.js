@@ -330,6 +330,7 @@ class App {
 			"E-btn-img",
 			"fullscreen-btn",
 			"fullscreen-btn-img",
+			"about",
 		];
 		for (const name of elementNames) {
 			this.dom[name] = document.getElementById(name);
@@ -399,6 +400,10 @@ class App {
 		this.dom.main.style.height = `${height}px`;
 		this.dom.main.style.top = `${(window.innerHeight - height) / 2}px`;
 		this.dom.main.style['font-size'] = `${width / (config.width * config.domPixelMultiplier)}px`; // scale definition of '1em'
+
+		const remainingWidth = window.innerWidth - width;
+		this.dom.about.style.width = `${Math.min(remainingWidth / 2, config.width) - 20}px`;
+		this.dom.about.style.display = remainingWidth > 400 ? 'block' : 'none';
 	}
 
 	onKeyDown(ev) {

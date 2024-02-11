@@ -34,6 +34,38 @@ canvas,
 	right: 0;
 }
 
+#about {
+	position: absolute;
+	left: 100%;
+	padding-top: 3.0rem;
+	padding-left: 1.0rem;
+
+	color: #d2d2d2;
+	font-size: 1.1rem;
+	font-family: monospace;
+}
+#about h1 {
+	color: white;
+	font-size: 1.1rem;
+	font-weight: 800;
+	margin: 0;
+}
+#about h2 {
+	color: white;
+	font-size: 1.1rem;
+	font-style: italic;
+	font-weight: normal;
+	margin: 0;
+}
+#about h2 a {
+	color: inherit;
+}
+#about p {
+	font-size: 1.1rem;
+	margin: 0;
+	margin-top: 1rem;
+}
+
 button {
 	border: none;
 	padding: 0;
