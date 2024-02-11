@@ -450,7 +450,7 @@ class App {
 
 		const remainingWidth = window.innerWidth - width;
 		this.dom.about.style.width = `${Math.min(remainingWidth / 2, config.width) - 20}px`;
-		this.dom.about.style.display = remainingWidth > 400 ? 'block' : 'none';
+		this.dom.about.style.display = remainingWidth > 400 && document.fullscreenElement == null ? 'block' : 'none';
 	}
 
 	onKeyDown(ev) {
