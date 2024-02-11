@@ -47,6 +47,7 @@ const config = {
 	hud: {
 		livesMargin: 5,
 	},
+	menuMusicVolume: 0.5,
 
 	// == DEBUG ==
 	//countDownDelay: 100,
@@ -259,7 +260,10 @@ class App {
 			sounds: {},
 		};
 		this.dom = {};
-		this.audio = { context: null };
+		this.audio = {
+			context: null,
+			mixers: {},
+		};
 
 		const $dom = new Promise(resolve => {
 			document.addEventListener("DOMContentLoaded", resolve());
@@ -360,6 +364,7 @@ class App {
 			"fullscreen-btn-img",
 			"about",
 			"discours-audio",
+			"menu-music-audio",
 		];
 		for (const name of elementNames) {
 			this.dom[name] = document.getElementById(name);
@@ -388,8 +393,21 @@ class App {
 				document.exitFullscreen();
 			} else {
 				this.dom.container.requestFullscreen();
+				if (this.state.scene == 'MENU') {
+					this.fadeInMenuMusic();
+				}
 			}
 		});
+
+		// Init DOM-dependent sound
+		const audioCtx = this.audio.context;
+		this.dom["menu-music-audio"].loop = true;
+		const track = new MediaElementAudioSourceNode(audioCtx, {
+			mediaElement: this.dom["menu-music-audio"],
+		});
+		const menuMusicMixer = new GainNode(audioCtx);
+		track.connect(menuMusicMixer).connect(audioCtx.destination);
+		this.audio.mixers.menuMusic = menuMusicMixer;
 
 		document.addEventListener("keydown", this.onKeyDown.bind(this));
 		document.addEventListener("keyup", this.onKeyUp.bind(this));
@@ -635,6 +653,7 @@ class App {
 		this.dom["play-btn"].style.display = 'block';
 		this.dom["E-btn"].style.display = 'block';
 		this.dom["fullscreen-btn"].style.display = 'block';
+		this.fadeInMenuMusic();
 	}
 
 	stopMenu() {
@@ -643,7 +662,33 @@ class App {
 		this.dom["fullscreen-btn"].style.display = 'none';
 	}
 
+	async fadeInMenuMusic() {
+		const { menuMusic } = this.audio.mixers;
+		const sound = this.dom["menu-music-audio"];
+
+		menuMusic.gain.value = 0.0;
+		sound.play();
+
+		for (let gain = menuMusic.gain.value ; gain <= 1.0 ; gain += 0.02) {
+			menuMusic.gain.value = Math.min(gain, 1.0) * config.menuMusicVolume;
+			await wait(20);
+		}
+	}
+
+	async fadeOutMenuMusic() {
+		const { menuMusic } = this.audio.mixers;
+		const sound = this.dom["menu-music-audio"];
+
+		for (let gain = menuMusic.gain.value ; gain >= 0.0 ; gain -= 0.02) {
+			menuMusic.gain.value = Math.max(0.0, gain);
+			console.log("menuMusic.gain.value", menuMusic.gain.value) * config.menuMusicVolume;
+			await wait(20);
+		}
+		sound.pause();
+	}
+
 	startTransitionToGame() {
+		this.fadeOutMenuMusic();
 		this.dom["play-btn"].style.display = 'none';
 		this.state.transitionToGameStartTime = performance.now();
 		wait(config.anim.transitionToGame.duration)
