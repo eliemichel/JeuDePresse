@@ -48,11 +48,17 @@ const config = {
 		livesMargin: 5,
 	},
 	menuMusicVolume: 0.5,
+	difficultyIncrementTime: 5000,
+	ennemySkinFromType: {
+		'GUILLOTINE': "guillotine",
+		'HEART': "heartMob",
+	},
 
 	// == DEBUG ==
 	//countDownDelay: 100,
 	//startScene: 'GAME',
-	//defaultLives: 2,
+	//defaultLives: 10,
+	//difficultyIncrementTime: 5000,
 	// ==  ==
 };
 
@@ -223,14 +229,36 @@ function setupButton(args) {
 	}
 }
 
+function samplePatternIndex(difficulty, distributions) {
+	let likelihoods = [];
+	for (const dist of distributions) {
+		if (dist.fromDifficulty > difficulty) {
+			break;
+		}
+		likelihoods = dist.likelihoods;
+	}
+	const total = likelihoods.reduce((s, x) => s + x, 0);
+	let sample = Math.floor(Math.random() * total);
+	let patternIdx = 0;
+	for (const l of likelihoods) {
+		sample -= l;
+		if (sample < 0) {
+			break;
+		}
+		patternIdx += 1;
+	}
+	return Math.min(patternIdx, likelihoods.length - 1);
+}
+
 class App {
 	constructor() {
 		this.state = {
 			needRedraw: true,
 			scene: 'MENU', // of [ 'MENU', 'GAME', 'END' ]
 			ennemies: [
-				// { x, y }
+				// { x, y, type }
 			],
+			topOfGeneratedEnnemies: 0,
 			character: {
 				position: { x: config.width / 2, y: 600 },
 				velocity: { x: 0, y: 0 },
@@ -253,6 +281,7 @@ class App {
 			lastLifeSkin: "heart",
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
+			difficulty: 0,
 		};
 		this.assets = {
 			images: {},
@@ -315,6 +344,7 @@ class App {
 			{ name: "heartBroken01", background: [255, 174, 201] },
 			{ name: "heartBroken02", background: [255, 174, 201] },
 			{ name: "heartBroken03", background: [255, 174, 201] },
+			{ name: "heartMob", background: [255, 174, 201], computeContentBBox: true },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -681,7 +711,6 @@ class App {
 
 		for (let gain = menuMusic.gain.value ; gain >= 0.0 ; gain -= 0.02) {
 			menuMusic.gain.value = Math.max(0.0, gain);
-			console.log("menuMusic.gain.value", menuMusic.gain.value) * config.menuMusicVolume;
 			await wait(20);
 		}
 		sound.pause();
@@ -702,9 +731,19 @@ class App {
 		this.dom["discours-audio"].play();
 		this.dom["fullscreen-btn"].style.display = 'block';
 		state.ennemies = [];
+		state.topOfGeneratedEnnemies = 0;
 		state.lives = config.defaultLives;
 		this.restartGameAfterHit();
 		this.startCountDown();
+
+		// Coroutine that increments difficulty
+		(async () => {
+			while (state.scene == 'GAME') {
+				await wait(config.difficultyIncrementTime);
+				state.difficulty += 1;
+				console.log("difficulty", state.difficulty);
+			}
+		})();
 	}
 
 	restartGameAfterHit() {
@@ -749,18 +788,27 @@ class App {
 		});
 	}
 
-	onCharacterHit() {
-		Promise.all([
-			this.playHeartBreakAnimation(),
-			this.playCharacterDepthAnimation(),
-		]).then(() => {
-			if (this.state.lives <= 0) {
-				this.startGameOver();
-			} else {
-				this.restartGameAfterHit();
-				return this.playCharacterInvicible();
-			}
-		})
+	onCharacterHit(ennemy) {
+		if (ennemy.type == 'HEART') {
+			
+			this.state.lives += 1;
+			this.playCharacterInvicible();
+
+		} else if (ennemy.type == 'GUILLOTINE') {
+			
+			Promise.all([
+				this.playHeartBreakAnimation(),
+				this.playCharacterDepthAnimation(),
+			]).then(() => {
+				if (this.state.lives <= 0) {
+					this.startGameOver();
+				} else {
+					this.restartGameAfterHit();
+					return this.playCharacterInvicible();
+				}
+			});
+
+		}
 	}
 
 	async playHeartBreakAnimation() {
@@ -824,7 +872,8 @@ class App {
 			console.error(`Invalid scene ID: '${newScene}'`);
 			return;
 		}
-		switch (newScene) {
+		state.scene = newScene;
+		switch (state.scene) {
 		case 'MENU':
 			this.startMenu();
 			break;
@@ -838,7 +887,6 @@ class App {
 			console.error(`Invalid scene ID: '${newScene}'`);
 			return;
 		}
-		state.scene = newScene;
 		state.needRedraw = true;
 	}
 
@@ -879,15 +927,18 @@ class App {
 
 		// Ennemy update
 		if (state.countDown == 0) {
+			// Spawn new procedural ennemy blocks if needed
+			if (state.topOfGeneratedEnnemies > 0) {
+				this.spawnNewEnnemyBlock();
+			}
+
+			// Update ennemy position
+			state.topOfGeneratedEnnemies += config.fallSpeed * dt;
 			for (const en of ennemies) {
 				en.y += config.fallSpeed * dt;
 			}
-			if (ennemies.length == 0 || ennemies.at(-1).y > config.ennemySpawn.distance) {
-				const img = images.guillotine;
-				const x = Math.floor(Math.random() * (config.width - img.width));
-				const y = -img.height;
-				ennemies.push({ x, y });
-			}
+
+			// Remove ennemies that are below the screen
 			state.ennemies = state.ennemies.filter(en => en.y < config.height);
 		}
 
@@ -910,40 +961,132 @@ class App {
 		// Collision detection
 		if (!state.isDead && !state.isInvicible) {
 			for (const en of ennemies) {
+				const skin = config.ennemySkinFromType[en.type];
+				const enBbox = bboxes[skin];
 				if (!bboxIsEmpty(bboxIntersection(
-					bboxOffset(bboxes.guillotine, en.x, en.y),
+					bboxOffset(enBbox, en.x, en.y),
 					bboxFromImage(images.character, character.position.x - images.character.width / 2, character.position.y)
 				))) {
 					const x = character.position.x - images.character.width / 2;
 					const y = character.position.y;
 					const lowerLeft = {
-						x: en.x + bboxes.guillotine.minx - x,
-						y: en.y + bboxes.guillotine.maxy - y,
+						x: en.x + enBbox.minx - x,
+						y: en.y + enBbox.maxy - y,
 					};
 					const lowerMiddle = {
-						x: en.x + (bboxes.guillotine.minx + bboxes.guillotine.maxx) / 2 - x,
-						y: en.y + bboxes.guillotine.maxy - y,
+						x: en.x + (enBbox.minx + enBbox.maxx) / 2 - x,
+						y: en.y + enBbox.maxy - y,
 					};
 					const lowerRight = {
-						x: en.x + bboxes.guillotine.maxx - x,
-						y: en.y + bboxes.guillotine.maxy - y,
+						x: en.x + enBbox.maxx - x,
+						y: en.y + enBbox.maxy - y,
 					};
 					const upperMiddle = {
-						x: en.x + (bboxes.guillotine.minx + bboxes.guillotine.maxx) / 2 - x,
-						y: en.y + bboxes.guillotine.miny - y,
+						x: en.x + (enBbox.minx + enBbox.maxx) / 2 - x,
+						y: en.y + enBbox.miny - y,
 					};
 					const lowerLeftHit = isOpaqueAt(images.character, lowerLeft);
 					const lowerMiddleHit = isOpaqueAt(images.character, lowerMiddle);
 					const lowerRightHit = isOpaqueAt(images.character, lowerRight);
 					const upperRightHit = isOpaqueAt(images.character, upperMiddle);
 					if (lowerLeftHit || lowerMiddleHit || lowerRightHit || upperRightHit) {
-						this.onCharacterHit();
+						this.onCharacterHit(en);
 					}
 				}
 			}
 		}
 
 		state.needRedraw = true;
+	}
+
+	spawnNewEnnemyBlock() {
+		const { state, assets } = this;
+		const { ennemies } = state;
+
+		const distributions = [
+			{
+				fromDifficulty: 0,
+				likelihoods: [ 1, 1 ],
+			},
+			{
+				fromDifficulty: 2,
+				likelihoods: [ 1, 1, 2, 2 ],
+			},
+			{
+				fromDifficulty: 4,
+				likelihoods: [ 1, 1, 3, 3 ],
+			},
+			{
+				fromDifficulty: 7,
+				likelihoods: [ 0, 1*2, 3*2, 3*2, 1 ],
+			},
+			{
+				fromDifficulty: 7,
+				likelihoods: [ 0, 1*2*4, 3*2*4, 3*2*4, 1*4, 1 ],
+			},
+		];
+
+		const img = assets.images.guillotine;
+
+		const patternIdx = samplePatternIndex(state.difficulty, distributions);
+
+		let blockHeight = 0;
+
+		switch (patternIdx) {
+		case 0: // fall-through
+		case 1:
+			{
+				const x = Math.floor(Math.random() * config.width) - img.width / 2;
+				const y = state.topOfGeneratedEnnemies - img.height;
+				ennemies.push({ x, y, type: 'GUILLOTINE' });
+
+				blockHeight = img.height + (patternIdx + 1) * config.ennemySpawn.distance;
+				break;
+			}
+		case 2:
+		case 3:
+			{
+				const isOffsetAtA = Math.random() > 0.5;
+				const yoffsetA = patternIdx == 3 && isOffsetAtA ? img.height / 2 : 0;
+				const yoffsetB = patternIdx == 3 && !isOffsetAtA ? img.height / 2 : 0; 
+				const x = Math.floor(Math.random() * (config.width - img.width)) - img.width / 2;
+				const y = state.topOfGeneratedEnnemies - img.height;
+				ennemies.push({ x, y: y - yoffsetA, type: 'GUILLOTINE' });
+				ennemies.push({ x: x + img.width, y: y - yoffsetB, type: 'GUILLOTINE' });
+
+				blockHeight = img.height + Math.max(yoffsetA, yoffsetB) + config.ennemySpawn.distance;
+				break;
+			}
+		case 4:
+			{
+				const n = Math.random() > 0.5 ? 3 : 4;
+				const patternWidth = n * img.width * 0.75;
+				const reverse = Math.random() > 0.5;
+				let x = Math.floor(Math.random() * (config.width + img.width - patternWidth)) - img.width / 2;
+				let y = state.topOfGeneratedEnnemies - img.height;
+				if (reverse) x += patternWidth - img.width;
+				for (let i = 0 ; i < n ; ++i) {
+					ennemies.push({ x, y, type: 'GUILLOTINE' });
+					y -= img.height / 2;
+					x += (reverse ? -1 : 1) * img.height * 0.75;
+				}
+				blockHeight = (state.topOfGeneratedEnnemies - y) + config.ennemySpawn.distance;
+				break;
+			}
+		case 5:
+			{
+				const patternWidth = img.width;
+				const x = Math.floor(Math.random() * (config.width + img.width - patternWidth)) - img.width / 2;
+				const y = state.topOfGeneratedEnnemies - img.height;
+				ennemies.push({ x, y, type: 'HEART' });
+
+				blockHeight = img.height + config.ennemySpawn.distance;
+				break;
+			}
+		}
+
+		state.topOfGeneratedEnnemies -= blockHeight;
+
 	}
 
 	playSound(soundName, loop) {
@@ -987,7 +1130,8 @@ class App {
 				ctx.drawImage(img, (config.width - img.width) / 2, (config.height - img.height) / 2);
 			}
 			for (const en of ennemies) {
-				ctx.drawImage(images.guillotine, en.x, en.y);
+				const skin = config.ennemySkinFromType[en.type];
+				ctx.drawImage(images[skin], en.x, en.y);
 			}
 
 			for (let i = 0 ; i < state.lives ; ++i) {
