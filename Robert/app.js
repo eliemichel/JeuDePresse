@@ -548,15 +548,18 @@ class App {
 			.then(() => {
 				this.state.guillotineFrame = 1;
 				this.state.needRedraw = true;
-				return wait(100);
+				return wait(50);
 			})
 			.then(() => {
-				this.state.guillotineFrame = 2;
-				this.state.needRedraw = true;
 				if (this.state.scene == 'MENU') {
 					const soundIndex = Math.floor(Math.random() * 3);
 					this.playSound(`guillotine0${soundIndex+1}`);
 				}
+				return wait(50);
+			})
+			.then(() => {
+				this.state.guillotineFrame = 2;
+				this.state.needRedraw = true;
 				return wait(50);
 			})
 			.then(() => {
