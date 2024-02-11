@@ -36,13 +36,22 @@ const config = {
 			duration: 900,
 			speed: 400,
 		},
+		invicible: {
+			iterations: 5,
+			period: 500,
+		},
 	},
 	gravity: 0.0025,
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Robert/about",
+	defaultLives: 3,
+	hud: {
+		livesMargin: 5,
+	},
 
 	// == DEBUG ==
-	countDownDelay: 1000,
-	startScene: 'MENU',
+	//countDownDelay: 100,
+	//startScene: 'GAME',
+	//defaultLives: 2,
 	// ==  ==
 };
 
@@ -217,9 +226,12 @@ class App {
 				rotation: 0,
 				movingRight: false,
 				movingLeft: false,
+				skin: "character",
 			},
 			countDown: 0,
 			idDead: false,
+			isInvicible: false,
+			lives: config.defaultLives,
 			drag: {
 				active: false,
 				startCharacterPosition: { x: 0 },
@@ -227,6 +239,7 @@ class App {
 			},
 			robertFrame: 0,
 			guillotineFrame: 0,
+			lastLifeSkin: "heart",
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
 		};
@@ -273,6 +286,7 @@ class App {
 			{ name: "guillotineLarge03", background: [255, 174, 201] },
 			{ name: "guillotineLarge04", background: [255, 174, 201] },
 			{ name: "character", background: [255, 174, 201] },
+			{ name: "characterHighlight", background: [255, 174, 201] },
 			{ name: "robert01", background: [255, 174, 201] },
 			{ name: "robert02", background: [255, 174, 201] },
 			{ name: "robert03", background: [255, 174, 201] },
@@ -283,6 +297,10 @@ class App {
 			{ name: "gameover", background: [255, 174, 201] },
 			{ name: "fullscreen", background: [255, 174, 201] },
 			{ name: "fullscreenHover", background: [255, 174, 201] },
+			{ name: "heart", background: [255, 174, 201] },
+			{ name: "heartBroken01", background: [255, 174, 201] },
+			{ name: "heartBroken02", background: [255, 174, 201] },
+			{ name: "heartBroken03", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -609,11 +627,18 @@ class App {
 	}
 
 	startGame() {
-		this.state.ennemies = [];
-		this.state.isDead = false;
-		this.state.character.position = { x: config.width / 2, y: 600 };
-		this.state.character.rotation = 0;
+		const { state } = this;
+		state.ennemies = [];
+		state.lives = config.defaultLives;
+		this.restartGameAfterHit();
 		this.startCountDown();
+	}
+
+	restartGameAfterHit() {
+		const { state } = this;
+		state.isDead = false;
+		state.character.position = { x: config.width / 2, y: 600 };
+		state.character.rotation = 0;
 	}
 
 	stopGame() {
@@ -650,7 +675,35 @@ class App {
 		});
 	}
 
-	startGameOver() {
+	onCharacterHit() {
+		Promise.all([
+			this.playHeartBreakAnimation(),
+			this.playCharacterDepthAnimation(),
+		]).then(() => {
+			if (this.state.lives <= 0) {
+				this.startGameOver();
+			} else {
+				this.restartGameAfterHit();
+				return this.playCharacterInvicible();
+			}
+		})
+	}
+
+	async playHeartBreakAnimation() {
+		const { state } = this;
+
+		state.lastLifeSkin = "heartBroken01";
+		await wait(50);
+		state.lastLifeSkin = "heartBroken02";
+		await wait(50);
+		state.lastLifeSkin = "heartBroken03";
+		await wait(50);
+
+		state.lastLifeSkin = "heart";
+		state.lives -= 1;
+	}
+
+	async playCharacterDepthAnimation() {
 		const { state } = this;
 		const { character } = state;
 		state.isDead = true;
@@ -660,10 +713,25 @@ class App {
 		}
 		const soundIndex = Math.floor(Math.random() * 3);
 		this.playSound(`guillotine0${soundIndex+1}`);
-		wait(config.anim.death.duration)
-		.then(() => {
-			this.setScene('END');
-		})
+		await wait(config.anim.death.duration);
+	}
+
+	async playCharacterInvicible() {
+		const { state } = this;
+		const { character } = state;
+		state.isInvicible = true;
+		for (let i = 0 ; i < config.anim.invicible.iterations ; ++i) {
+			character.skin = "characterHighlight";
+			await wait(config.anim.invicible.period / 2);
+			character.skin = "character";
+			await wait(config.anim.invicible.period / 2);
+		}
+		state.isInvicible = false;
+	}
+
+	startGameOver() {
+
+		this.setScene('END');
 	}
 
 	setScene(newScene) {
@@ -766,7 +834,7 @@ class App {
 		}
 
 		// Collision detection
-		if (!state.isDead) {
+		if (!state.isDead && !state.isInvicible) {
 			for (const en of ennemies) {
 				if (!bboxIsEmpty(bboxIntersection(
 					bboxOffset(bboxes.guillotine, en.x, en.y),
@@ -795,7 +863,7 @@ class App {
 					const lowerRightHit = isOpaqueAt(images.character, lowerRight);
 					const upperRightHit = isOpaqueAt(images.character, upperMiddle);
 					if (lowerLeftHit || lowerMiddleHit || lowerRightHit || upperRightHit) {
-						this.startGameOver();
+						this.onCharacterHit();
 					}
 				}
 			}
@@ -848,6 +916,11 @@ class App {
 				ctx.drawImage(images.guillotine, en.x, en.y);
 			}
 
+			for (let i = 0 ; i < state.lives ; ++i) {
+				const heartSkin = i == state.lives - 1 ? state.lastLifeSkin : 'heart';
+				ctx.drawImage(images[heartSkin], config.width - config.hud.livesMargin - (i + 1) * images.heart.width, config.hud.livesMargin);
+			}
+
 			// Character
 			ctx.save();
 			
@@ -855,7 +928,7 @@ class App {
 			ctx.rotate(character.rotation * Math.PI / 180);
 			ctx.translate(-character.position.x, -(character.position.y + images.character.height / 2));
 
-			ctx.drawImage(images.character, character.position.x - images.character.width / 2, character.position.y);
+			ctx.drawImage(images[character.skin], character.position.x - images.character.width / 2, character.position.y);
 			ctx.restore();
 			break;
 		case 'END':
