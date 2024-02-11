@@ -387,6 +387,8 @@ class App {
 			{ name: "2", background: [255, 174, 201] },
 			{ name: "3", background: [255, 174, 201] },
 			{ name: "gameover", background: [255, 174, 201] },
+			{ name: "fullscreen", background: [255, 174, 201] },
+			{ name: "fullscreenHover", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -402,16 +404,21 @@ class App {
 	}
 
 	onDomContentLoaded() {
-		this.dom = {
-			"main": document.getElementById("main"),
-			"canvas": document.getElementById("canvas"),
-			"play-btn": document.getElementById("play-btn"),
-			"play-btn-img": document.getElementById("play-btn-img"),
-			"back-btn": document.getElementById("back-btn"),
-			"back-btn-img": document.getElementById("back-btn-img"),
-			"E-btn": document.getElementById("E-btn"),
-			"E-btn-img": document.getElementById("E-btn-img"),
-		};
+		const elementNames = [
+			"main",
+			"canvas",
+			"play-btn",
+			"play-btn-img",
+			"back-btn",
+			"back-btn-img",
+			"E-btn",
+			"E-btn-img",
+			"fullscreen-btn",
+			"fullscreen-btn-img",
+		];
+		for (const name of elementNames) {
+			this.dom[name] = document.getElementById(name);
+		}
 		this.dom.container = this.dom.main.parentElement;
 
 		this.dom.canvas.width = config.width;
@@ -429,6 +436,14 @@ class App {
 
 		this.dom["E-btn"].addEventListener("click", e => {
 			window.open(config.aboutUrl, '_blank');
+		});
+
+		this.dom["fullscreen-btn"].addEventListener("click", e => {
+			if (document.fullscreenElement) {
+				document.exitFullscreen();
+			} else {
+				this.dom.container.requestFullscreen();
+			}
 		});
 
 		document.addEventListener("keydown", this.onKeyDown.bind(this));
@@ -472,6 +487,11 @@ class App {
 			bottom: 0,
 			left: 0
 		});
+		autoSetupButton("fullscreen", {
+			top: 0,
+			left: 0
+		});
+		this.dom[`fullscreen-btn-img`].style.opacity = this.dom.canvas.requestFullscreen ? 0.5 : 0.0;
 
 		// Robert animation
 		const robertAnimation = () => {
@@ -532,11 +552,13 @@ class App {
 		this.state.transitionToGameStartTime = null;
 		this.dom["play-btn"].style.display = 'block';
 		this.dom["E-btn"].style.display = 'block';
+		this.dom["fullscreen-btn"].style.display = 'block';
 	}
 
 	stopMenu() {
 		this.dom["play-btn"].style.display = 'none';
 		this.dom["E-btn"].style.display = 'none';
+		this.dom["fullscreen-btn"].style.display = 'none';
 	}
 
 	startTransitionToGame() {
