@@ -12,6 +12,6 @@ Utiliser les touches flèchées, ou bien cliquer-glisser, pour déplacer le pers
 Crédits
 -------
 
- - Conception et création : Élie Michel, Félix David
+ - Conception et création : **Élie Michel**, **Félix David-Rivière**
  - [Musique du menu](https://freesound.org/people/Ncone/sounds/721148/) par [Sean Allison Mendoza](https://soundcloud.com/sean-allison-mendoza).
  - Merci à Henri pour les retours et suggestions !

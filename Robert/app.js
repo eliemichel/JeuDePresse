@@ -420,9 +420,11 @@ class App {
 
 		this.dom["fullscreen-btn"].addEventListener("click", e => {
 			if (document.fullscreenElement) {
+				screen.orientation.unlock();
 				document.exitFullscreen();
 			} else {
 				this.dom.container.requestFullscreen();
+				screen.orientation.lock('portrait').catch(err => console.log(`Could not lock portrait mode.`));
 				if (this.state.scene == 'MENU') {
 					this.fadeInMenuMusic();
 				}

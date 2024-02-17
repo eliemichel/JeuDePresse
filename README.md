@@ -13,4 +13,4 @@ Auteurs
 -------
 
  - Élie Michel
- - Félix David
+ - Félix David-Rivière
