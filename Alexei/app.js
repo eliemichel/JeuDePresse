@@ -293,6 +293,7 @@ class App {
 			{ name: "poutineA", background: [239, 228, 176] },
 			{ name: "poutineB", background: [239, 228, 176] },
 			{ name: "thuneB", background: [255, 174, 201], computeContentBBox: true },
+			{ name: "europe", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -836,12 +837,18 @@ class App {
 
 		// Collision detection
 		for (const proj of projectiles) {
-			const collides = !bboxIsEmpty(bboxIntersection(
+			const collidesShield = !bboxIsEmpty(bboxIntersection(
 				bboxOffset(bboxes[proj.skin], proj.position.x - images[proj.skin].width / 2.0, proj.position.y - images[proj.skin].height / 2.0),
 				bboxOffset(bboxes.shield, shield.position.x, shield.position.y - images.shield.height / 2.0),
 			));
 
-			if (collides) {
+			if (collidesShield) {
+				proj.velocity.x = -proj.velocity.x;
+			}
+
+			const collidesEurope = false;
+
+			if (collidesEurope) {
 				proj.velocity.x = -proj.velocity.x;
 			}
 		}
@@ -886,6 +893,7 @@ class App {
 			break;
 		case 'GAME':
 			ctx.drawImage(images.poutineA, 0, 0);
+			ctx.drawImage(images.europe, 0, 0);
 			ctx.drawImage(images.shield, shield.position.x, shield.position.y - images.shield.height / 2.0);
 
 			for (const proj of state.projectiles) {
