@@ -10,11 +10,28 @@ const config = {
 	maximumCorruption: 9, // M€
 	corruptionPerProjectile: 1,
 	initialProjectileVelocity: {
-		x: -0.8,
-		y: -0.6,
+		min: {
+			angle: 20.0,
+			magnitude: 0.8,
+		},
+		max: {
+			angle: 70.0,
+			magnitude: 1.3,
+		},
+	},
+	bounceProjectileVelocity: {
+		x: 0.8,
+		y: 0.6,
 	},
 	putinSleepDuration: 3000, // ms
 	anim: {
+		poutineFires: {
+			start: 2000,
+			wait: {
+				min: 500,
+				max: 2000,
+			},
+		},
 		guillotine: {
 			start: 3000,
 			wait: {
@@ -60,6 +77,8 @@ const zip = (...rows) => [...rows[0]].map((_,c) => rows.map(row => row[c]));
 function wait(ms) {
 	return new Promise(resolve => { setTimeout(resolve, ms); });
 }
+
+const lerp = (a, b, t) => a * (1.0 - t) + b * t;
 
 function fetchImage(url) {
 	return new Promise(resolve => {
@@ -649,6 +668,16 @@ class App {
 		this.dom["fullscreen-btn"].style.display = 'block';
 		this.restartGameAfterHit();
 		this.startCountDown();
+
+		// Poutine fires
+		(async () => {
+			const { start, wait: range } = config.anim.poutineFires;
+			await wait(start);
+			while (state.scene == 'GAME') {
+				this.triggerPoutineFire();
+				await wait(lerp(range.min, range.max, Math.random()));
+			}
+		})();
 	}
 
 	restartGameAfterHit() {
@@ -695,10 +724,24 @@ class App {
 	triggerPoutineFire() {
 		const { state } = this;
 		console.log("Poutine fires!");
+
+		const fac = Math.random();
+		//const velocity = {
+		//	x: -lerp(config.initialProjectileVelocity.min.x, config.initialProjectileVelocity.max.x, fac),
+		//	y: -lerp(config.initialProjectileVelocity.min.y, config.initialProjectileVelocity.max.y, fac),
+		//};
+		const velocity = {
+			angle: lerp(config.initialProjectileVelocity.min.angle, config.initialProjectileVelocity.max.angle, fac),
+			magnitude: lerp(config.initialProjectileVelocity.min.magnitude, config.initialProjectileVelocity.max.magnitude, fac),
+		};
+		const radians = velocity.angle * Math.PI / 180;
+		velocity.x = -velocity.magnitude * Math.cos(radians);
+		velocity.y = -velocity.magnitude * Math.sin(radians);
+
 		state.projectiles.push({
 			skin: "thuneB",
 			position: { x: 600, y: 270 },
-			velocity: {...config.initialProjectileVelocity},
+			velocity,
 			isDestroyed: false,
 			corruption: config.corruptionPerProjectile,
 		});
@@ -715,7 +758,7 @@ class App {
 		const deltaY = shield.position.y - projectileCenterY;
 
 		projectile.velocity.x = Math.abs(projectile.velocity.x);
-		projectile.velocity.y += config.initialProjectileVelocity.y * deltaY * 0.02;
+		projectile.velocity.y += -config.bounceProjectileVelocity.y * deltaY * 0.02;
 	}
 
 	onEuropeHit(projectile) {
@@ -755,19 +798,6 @@ class App {
 
 		state.lastLifeSkin = "heart";
 		state.lives -= 1;
-	}
-
-	async playCharacterDepthAnimation() {
-		const { state } = this;
-		const { character } = state;
-		state.isDead = true;
-		character.velocity = {
-			x: (character.movingRight ? 1 : character.movingLeft ? -1 : 0) * config.anim.death.initialVelocity.x,
-			y: config.anim.death.initialVelocity.y,
-		}
-		const soundIndex = Math.floor(Math.random() * 3);
-		this.playSound(`guillotine0${soundIndex+1}`);
-		await wait(config.anim.death.duration);
 	}
 
 	async playCharacterInvicible() {
