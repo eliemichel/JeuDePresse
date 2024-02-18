@@ -72,7 +72,7 @@ const config = {
 
 	// == DEBUG ==
 	//countDownDelay: 100,
-	startScene: 'GAME',
+	startScene: 'MENU',
 	//defaultLives: 10,
 	//difficultyIncrementTime: 5000,
 	// ==  ==
@@ -334,7 +334,21 @@ class App {
 			{ name: "poutineSmallAsleep", background: [255, 174, 201] },
 			{ name: "canon", background: [255, 174, 201] },
 			{ name: "victoire", background: null },
+			{ name: "menu", background: null },
 			{ name: "lepen", background: [255, 174, 201], computeContentBBox: true },
+
+			{ name: "play", background: [255, 174, 201] },
+			{ name: "playHover", background: [255, 174, 201] },
+			{ name: "playPressed", background: [255, 174, 201] },
+			{ name: "playHighlight", background: [255, 174, 201] },
+			{ name: "about", background: [255, 174, 201] },
+			{ name: "aboutHover", background: [255, 174, 201] },
+			{ name: "aboutPressed", background: [255, 174, 201] },
+			{ name: "back", background: [255, 174, 201] },
+			{ name: "backHover", background: [255, 174, 201] },
+			{ name: "backPressed", background: [255, 174, 201] },
+			{ name: "fullscreen", background: [255, 174, 201] },
+			{ name: "fullscreenHover", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -395,6 +409,8 @@ class App {
 			"canvas",
 			"play-btn",
 			"play-btn-img",
+			"about-btn",
+			"about-btn-img",
 			"back-btn",
 			"back-btn-img",
 			"E-btn",
@@ -418,6 +434,10 @@ class App {
 			this.startTransitionToGame();
 		});
 
+		this.dom["about-btn"].addEventListener("click", e => {
+			window.open(config.aboutUrl, '_blank');
+		});
+
 		this.dom["back-btn"].addEventListener("click", e => {
 			this.setScene('MENU');
 		});
@@ -432,7 +452,7 @@ class App {
 				document.exitFullscreen();
 			} else {
 				this.dom.container.requestFullscreen();
-				screen.orientation.lock('portrait').catch(err => console.log(`Could not lock portrait mode.`));
+				screen.orientation.lock('landscape').catch(err => console.log(`Could not lock landscape mode.`));
 				if (this.state.scene == 'MENU') {
 					this.fadeInMenuMusic();
 				}
@@ -598,24 +618,29 @@ class App {
 			});
 		}
 
-		/*
-		autoSetupButton("play", {
-			top: 240,
-			right: 30
-		});
 		autoSetupButton("back", {
 			top: 0,
 			left: 0
 		});
+		autoSetupButton("fullscreen", {
+			top: 0,
+			right: 0
+		});
+		autoSetupButton("play", {
+			top: 40,
+			right: 60
+		});
+		autoSetupButton("about", {
+			top: 100,
+			right: 60
+		});
+		/*
 		autoSetupButton("E", {
 			bottom: 0,
 			left: 0
 		});
-		autoSetupButton("fullscreen", {
-			top: 0,
-			left: 0
-		});
 		this.dom[`fullscreen-btn-img`].style.opacity = this.dom.canvas.requestFullscreen ? 0.5 : 0.0;
+		*/
 
 		// Play button animation
 		const playButtonAnimation = async () => {
@@ -631,7 +656,6 @@ class App {
 			playButtonAnimation();
 		}
 		playButtonAnimation();
-		*/
 
 		this.setScene(config.startScene);
 		requestAnimationFrame(this.onFrame.bind(this));
@@ -640,6 +664,7 @@ class App {
 	startMenu() {
 		this.state.transitionToGameStartTime = null;
 		this.dom["play-btn"].style.display = 'block';
+		this.dom["about-btn"].style.display = 'block';
 		this.dom["E-btn"].style.display = 'block';
 		this.dom["fullscreen-btn"].style.display = 'block';
 		this.fadeInMenuMusic();
@@ -647,6 +672,7 @@ class App {
 
 	stopMenu() {
 		this.dom["play-btn"].style.display = 'none';
+		this.dom["about-btn"].style.display = 'none';
 		this.dom["E-btn"].style.display = 'none';
 		this.dom["fullscreen-btn"].style.display = 'none';
 	}
@@ -1032,21 +1058,7 @@ class App {
 
 		switch (scene) {
 		case 'MENU':
-			const positions ={
-				robert: 0,
-				guillotine: 0,
-				menu: -90,
-			};
-			if (this.state.transitionToGameStartTime != null) {
-				const time = (performance.now() - this.state.transitionToGameStartTime) / 1000.0;
-				const speed = config.anim.transitionToGame.speed;
-				positions.robert = time * speed;
-				positions.guillotine = -time * speed;
-				positions.menu = -90-time * speed + speed * 0.5 * Math.sin(Math.PI * Math.exp(-time));
-			}
-			ctx.drawImage(images.menuTitle, 0, positions.menu);
-			ctx.drawImage(images[`robert0${state.robertFrame+1}`], positions.robert, 0);
-			ctx.drawImage(images[`guillotineLarge0${state.guillotineFrame+1}`], positions.guillotine, 0);
+			ctx.drawImage(images.menu, 0, 0);
 			break;
 		case 'GAME':
 			let putinSkin = "poutineSmall";
