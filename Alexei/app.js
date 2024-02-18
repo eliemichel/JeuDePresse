@@ -1,7 +1,6 @@
 const config = {
 	startScene: 'MENU',
 	shieldSpeed: 0.75,
-	fallSpeed: 0.2,
 	width: 720,
 	height: 380,
 	countDownDelay: 1000, // ms between each number
@@ -19,16 +18,16 @@ const config = {
 	initialProjectileVelocity: {
 		min: {
 			angle: 20.0,
-			magnitude: 0.8,
+			magnitude: 0.9 * 0.7,
 		},
 		max: {
 			angle: 70.0,
-			magnitude: 1.3,
+			magnitude: 1.3 * 0.7,
 		},
 	},
 	bounceProjectileVelocity: {
-		x: 0.8,
-		y: 0.6,
+		x: 0.8 * 0.7,
+		y: 0.6 * 0.7,
 	},
 	anim: {
 		putinSleeps: {
@@ -58,7 +57,7 @@ const config = {
 			period: 500,
 		},
 	},
-	gravity: 0.0025,
+	gravity: 0.0025 * 0.5,
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Alexei/about",
 	defaultLives: 3,
 	hud: {
