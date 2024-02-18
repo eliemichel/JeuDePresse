@@ -679,30 +679,15 @@ class App {
 			skin: "thuneB",
 			position: { x: 600, y: 270 },
 			velocity: {...config.initialProjectileVelocity},
+			isDestroyed: false,
 		});
 	}
 
-	onCharacterHit(ennemy) {
-		if (ennemy.type == 'HEART') {
-			
-			this.state.lives += 1;
-			this.playCharacterInvicible();
+	onEuropHit(projectile) {
+		const { state } = this;
 
-		} else if (ennemy.type == 'GUILLOTINE') {
-			
-			Promise.all([
-				this.playHeartBreakAnimation(),
-				this.playCharacterDepthAnimation(),
-			]).then(() => {
-				if (this.state.lives <= 0) {
-					this.startGameOver();
-				} else {
-					this.restartGameAfterHit();
-					return this.playCharacterInvicible();
-				}
-			});
-
-		}
+		state.corruption += 1;
+		projectile.isDestroyed = true;
 	}
 
 	async playHeartBreakAnimation() {
@@ -837,8 +822,15 @@ class App {
 
 		// Collision detection
 		for (const proj of projectiles) {
+			const projBbox = bboxOffset(
+				bboxes[proj.skin],
+				proj.position.x - images[proj.skin].width / 2.0,
+				proj.position.y - images[proj.skin].height / 2.0
+			);
+
+			// Collusion with shield
 			const collidesShield = !bboxIsEmpty(bboxIntersection(
-				bboxOffset(bboxes[proj.skin], proj.position.x - images[proj.skin].width / 2.0, proj.position.y - images[proj.skin].height / 2.0),
+				projBbox,
 				bboxOffset(bboxes.shield, shield.position.x, shield.position.y - images.shield.height / 2.0),
 			));
 
@@ -846,12 +838,21 @@ class App {
 				proj.velocity.x = -proj.velocity.x;
 			}
 
-			const collidesEurope = false;
+			// Collision with Europe
+			const lowerLeft = {
+				x: projBbox.minx,
+				y: projBbox.maxy,
+			};
+			const lowerLeftHit = isOpaqueAt(images.europe, lowerLeft);
+			const collidesEurope = lowerLeftHit;
 
 			if (collidesEurope) {
-				proj.velocity.x = -proj.velocity.x;
+				this.onEuropHit(proj);
 			}
 		}
+
+		// Remove ennemies that are below the screen
+		state.projectiles = state.projectiles.filter(proj => !proj.isDestroyed && proj.position.y < config.height);
 
 		state.needRedraw = true;
 	}
