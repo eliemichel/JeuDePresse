@@ -1,6 +1,6 @@
 [< Tous les jeux](https://eliemichel.github.io/JeuDePresse)
 
-Alexei
+Alexeï
 ======
 
 Jeu de presse #**002** *18 février 2024*

@@ -41,20 +41,13 @@ const config = {
 				max: 2000,
 			},
 		},
-		guillotine: {
-			start: 3000,
-			wait: {
-				min: 3000,
-				max: 8000,
-			},
+		impact: {
+			offset: { x: 40 },
+			frameDuration: 50,
 		},
 		transitionToGame: {
-			duration: 900,
+			duration: 1100,
 			speed: 400,
-		},
-		invicible: {
-			iterations: 5,
-			period: 500,
 		},
 	},
 	gravity: 0.0025 * 0.5,
@@ -293,6 +286,8 @@ class App {
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
 			difficulty: 0,
+
+			fx: [],
 		};
 		this.assets = {
 			images: {},
@@ -323,19 +318,25 @@ class App {
 
 	loadImages() {
 		const imageInfo = [
-			{ name: "background", background: null },
 			{ name: "shield", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "thuneB", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "europe", background: [255, 174, 201] },
 			{ name: "gaugeEmpty", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "gaugeFull", background: [255, 174, 201] },
+			{ name: "corruption", background: [255, 174, 201] },
 			{ name: "gameover", background: null },
 			{ name: "poutineSmall", background: [255, 174, 201] },
 			{ name: "poutineSmallAsleep", background: [255, 174, 201] },
 			{ name: "canon", background: [255, 174, 201] },
 			{ name: "victoire", background: null },
-			{ name: "menu", background: null },
+			{ name: "menuFlags", background: [255, 174, 201] },
+			{ name: "menuPutin", background: [255, 174, 201] },
+			{ name: "menuTitle", background: [255, 174, 201] },
+			{ name: "menuLepen", background: [255, 174, 201] },
 			{ name: "lepen", background: [255, 174, 201], computeContentBBox: true },
+			{ name: "impact01", background: [255, 174, 201] },
+			{ name: "impact02", background: [255, 174, 201] },
+			{ name: "impact03", background: [255, 174, 201] },
 
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
@@ -704,6 +705,7 @@ class App {
 	startTransitionToGame() {
 		this.fadeOutMenuMusic();
 		this.dom["play-btn"].style.display = 'none';
+		this.dom["about-btn"].style.display = 'none';
 		this.state.transitionToGameStartTime = performance.now();
 		wait(config.anim.transitionToGame.duration)
 		.then(() => {
@@ -815,6 +817,25 @@ class App {
 
 		this.playSound(`coinsHit01`);
 		this.playSound(`metalHit0${Math.floor(Math.random() * 5) + 1}`);
+
+		// Impact effect
+		const fx = {
+			skin: "impact01",
+			position: {
+				x: shield.position.x + config.anim.impact.offset.x,
+				y: projectile.position.y,
+			},
+			isDestroyed: false,
+		};
+		state.fx.push(fx);
+		(async () => {
+			await wait(config.anim.impact.frameDuration);
+			fx.skin = "impact02";
+			await wait(config.anim.impact.frameDuration);
+			fx.skin = "impact03";
+			await wait(config.anim.impact.frameDuration);
+			fx.isDestroyed = true;
+		})();
 	}
 
 	onEuropeHit(projectile) {
@@ -975,6 +996,7 @@ class App {
 
 		// Collision detection
 		for (const proj of projectiles) {
+			const hasBounced = proj.velocity.x > 0;
 			const projBbox = bboxOffset(
 				bboxes[proj.skin],
 				proj.position.x - images[proj.skin].width / 2.0,
@@ -982,7 +1004,7 @@ class App {
 			);
 
 			// Collision with shield
-			const collidesShield = !bboxIsEmpty(bboxIntersection(
+			const collidesShield = !hasBounced && !bboxIsEmpty(bboxIntersection(
 				projBbox,
 				bboxOffset(bboxes.shield, shield.position.x, shield.position.y - images.shield.height / 2.0),
 			));
@@ -1018,7 +1040,6 @@ class App {
 				y: localProjBbox.maxy,
 			};
 			const lowerRightHit = isOpaqueAt(images.poutineSmall, lowerRight);
-			const hasBounced = proj.velocity.x > 0;
 			const collidesPutin = hasBounced && lowerRightHit;
 
 			if (collidesPutin) {
@@ -1028,6 +1049,8 @@ class App {
 
 		// Remove ennemies that are below the screen
 		state.projectiles = state.projectiles.filter(proj => !proj.isDestroyed && proj.position.y < config.height);
+
+		state.fx = state.fx.filter(fx => !fx.isDestroyed);
 
 		state.needRedraw = true;
 	}
@@ -1054,13 +1077,38 @@ class App {
 		const { images, bboxes } = this.assets;
 		const ctx = this.context2d;
 
-		ctx.drawImage(images.background, 0, 0);
-
 		switch (scene) {
+
 		case 'MENU':
-			ctx.drawImage(images.menu, 0, 0);
+			const positions ={
+				flags: 0,
+				title: 0,
+				putin: 0,
+				lepen: { x: 0, y: 0 },
+			};
+			if (this.state.transitionToGameStartTime != null) {
+				const time = (performance.now() - this.state.transitionToGameStartTime) / 1000.0;
+				const speed = config.anim.transitionToGame.speed;
+				const fac = time * speed - speed * 0.5 * Math.sin(Math.PI * Math.exp(-time));
+				positions.lepen.x = -1.5*2.0 * fac;
+				positions.lepen.y = -1.0*2.0 * fac;
+				positions.putin = Math.max(time - 0.1, 0.0) * speed;
+				positions.flags = Math.max(time - 0.2, 0.0) * speed;
+				positions.title = -Math.max(time - 0.3, 0.0) * speed;
+			}
+
+			ctx.fillStyle = "rgb(239, 228, 176)";
+			ctx.fillRect(0, 0, config.width, config.height);
+			ctx.drawImage(images.menuFlags, 0, positions.flags);
+			ctx.drawImage(images.menuTitle, 0, positions.title);
+			ctx.drawImage(images.menuPutin, 0, positions.putin);
+			ctx.drawImage(images.menuLepen, positions.lepen.x, positions.lepen.y);
 			break;
+
 		case 'GAME':
+			ctx.fillStyle = "rgb(239, 228, 176)";
+			ctx.fillRect(0, 0, config.width, config.height);
+
 			let putinSkin = "poutineSmall";
 			if (state.isPutinAsleep) {
 				const ellapsed = performance.now() - state.putinSleepStarted;
@@ -1079,7 +1127,13 @@ class App {
 				ctx.drawImage(img, proj.position.x - img.width / 2.0, proj.position.y - img.height / 2.0);
 			}
 
+			for (const fx of state.fx) {
+				const img = images[fx.skin];
+				ctx.drawImage(img, fx.position.x - img.width / 2.0, fx.position.y - img.height / 2.0);
+			}
+
 			// HUD
+			ctx.drawImage(images.corruption, 236, 0);
 			ctx.drawImage(images.gaugeEmpty, 0, 0);
 
 			ctx.save();
@@ -1091,6 +1145,7 @@ class App {
 			ctx.drawImage(images.gaugeFull, 0, 0);
 			ctx.restore();
 			break;
+
 		case 'END':
 			ctx.drawImage(state.victory ? images.victoire : images.gameover, 0, 0);
 			break;

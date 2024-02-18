@@ -1,4 +1,4 @@
-Alexei
+Alexeï
 ======
 
 Jeu de presse #**002** *18 février 2024*
