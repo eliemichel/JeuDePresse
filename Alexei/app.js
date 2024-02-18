@@ -23,9 +23,12 @@ const config = {
 		x: 0.8,
 		y: 0.6,
 	},
-	putinSleepDuration: 3000, // ms
 	anim: {
-		poutineFires: {
+		putinSleeps: {
+			duration: 3000, // ms
+			blinkDuration: 500, // ms
+		},
+		putinFires: {
 			start: 2000,
 			wait: {
 				min: 500,
@@ -278,6 +281,8 @@ class App {
 				startPosition: { y: 0 },
 			},
 			isPutinAsleep: false,
+			putinSleepStarted: null,
+
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
 			difficulty: 0,
@@ -315,6 +320,7 @@ class App {
 			{ name: "shield", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "poutineA", background: [239, 228, 176] },
 			{ name: "poutineB", background: [239, 228, 176] },
+			{ name: "poutineAAsleep", background: [239, 228, 176] },
 			{ name: "thuneB", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "europe", background: [255, 174, 201] },
 			{ name: "gaugeEmpty", background: [255, 174, 201], computeContentBBox: true },
@@ -662,10 +668,12 @@ class App {
 
 		// Poutine fires
 		(async () => {
-			const { start, wait: range } = config.anim.poutineFires;
+			const { start, wait: range } = config.anim.putinFires;
 			await wait(start);
 			while (state.scene == 'GAME') {
-				this.triggerPoutineFire();
+				if (!state.isPutinAsleep) {
+					this.triggerPoutineFire();
+				}
 				await wait(lerp(range.min, range.max, Math.random()));
 			}
 		})();
@@ -676,6 +684,7 @@ class App {
 		state.corruption = 0;
 		state.projectiles = [];
 		state.shield.position = { x: 280, y: config.height / 2 };
+		state.putinSleepStarted = null;
 	}
 
 	stopGame() {
@@ -778,7 +787,9 @@ class App {
 		this.playSound(`manPainSilly${Math.floor(Math.random() * 24) + 1}`);
 
 		state.isPutinAsleep = true;
-		await wait(config.putinSleepDuration);
+		state.putinSleepStarted = performance.now();
+		await wait(config.anim.putinSleeps.duration);
+		state.putinSleepStarted = null;
 		state.isPutinAsleep = false;
 	}
 
@@ -934,7 +945,8 @@ class App {
 				y: projBbox.maxy,
 			};
 			const lowerRightHit = isOpaqueAt(images.poutineA, lowerRight);
-			const collidesPutin = lowerRightHit;
+			const hasBounced = proj.velocity.x > 0;
+			const collidesPutin = hasBounced && lowerRightHit;
 
 			if (collidesPutin) {
 				this.onPutinHit(proj);
@@ -983,7 +995,14 @@ class App {
 			ctx.drawImage(images[`guillotineLarge0${state.guillotineFrame+1}`], positions.guillotine, 0);
 			break;
 		case 'GAME':
-			ctx.drawImage(images.poutineA, 0, 0);
+			let putinSkin = "poutineA";
+			if (state.isPutinAsleep) {
+				const ellapsed = performance.now() - state.putinSleepStarted;
+				if ((ellapsed / config.anim.putinSleeps.blinkDuration) % 1 < 0.5) {
+					putinSkin = "poutineAAsleep";
+				}
+			}
+			ctx.drawImage(images[putinSkin], 0, 0);
 			ctx.drawImage(images.europe, 0, 0);
 			ctx.drawImage(images.shield, shield.position.x, shield.position.y - images.shield.height / 2.0);
 
