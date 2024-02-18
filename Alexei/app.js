@@ -7,6 +7,8 @@ const config = {
 	countDownDelay: 1000, // ms between each number
 	pixelPerfect: false, // display in the exact 380x720 resolution, whichever the window size and pixel density
 
+	maximumCorruption: 9, // M€
+	corruptionPerProjectile: 1,
 	initialProjectileVelocity: {
 		x: -0.8,
 		y: -0.6,
@@ -294,6 +296,9 @@ class App {
 			{ name: "poutineB", background: [239, 228, 176] },
 			{ name: "thuneB", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "europe", background: [255, 174, 201] },
+			{ name: "gaugeEmpty", background: [255, 174, 201], computeContentBBox: true },
+			{ name: "gaugeFull", background: [255, 174, 201] },
+			{ name: "gameover", background: null },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -693,10 +698,22 @@ class App {
 			position: { x: 600, y: 270 },
 			velocity: {...config.initialProjectileVelocity},
 			isDestroyed: false,
+			corruption: config.corruptionPerProjectile,
 		});
 
 		const soundIndex = Math.floor(Math.random() * 7);
 		this.playSound(`bagCoins0${soundIndex+1}`);
+	}
+
+	onShieldHit(projectile) {
+		const { state, assets } = this;
+		const { shield } = state;
+
+		const projectileCenterY = projectile.position.y - assets.images[projectile.skin].height / 2;
+		const deltaY = shield.position.y - projectileCenterY;
+
+		projectile.velocity.x = Math.abs(projectile.velocity.x);
+		projectile.velocity.y += config.initialProjectileVelocity.y * deltaY * 0.02;
 	}
 
 	onEuropHit(projectile) {
@@ -704,8 +721,12 @@ class App {
 
 		this.playSound(`concreteSmash`);
 
-		state.corruption += 1;
+		state.corruption += projectile.corruption;
 		projectile.isDestroyed = true;
+
+		if (state.corruption >= config.maximumCorruption) {
+			this.startGameOver();
+		}
 	}
 
 	async playHeartBreakAnimation() {
@@ -749,7 +770,6 @@ class App {
 	}
 
 	startGameOver() {
-
 		this.setScene('END');
 	}
 
@@ -853,7 +873,7 @@ class App {
 			));
 
 			if (collidesShield) {
-				proj.velocity.x = -proj.velocity.x;
+				this.onShieldHit(proj);
 			}
 
 			// Collision with Europe
@@ -919,6 +939,18 @@ class App {
 				const img = images[proj.skin];
 				ctx.drawImage(img, proj.position.x - img.width / 2.0, proj.position.y - img.height / 2.0);
 			}
+
+			// HUD
+			ctx.drawImage(images.gaugeEmpty, 0, 0);
+
+			ctx.save();
+			ctx.beginPath();
+			const fac = state.corruption / config.maximumCorruption;
+			const clipX = bboxes.gaugeEmpty.minx + (bboxes.gaugeEmpty.maxx - bboxes.gaugeEmpty.minx) * fac;
+			ctx.rect(0, 0, clipX, images.gaugeEmpty.height);
+			ctx.clip();
+			ctx.drawImage(images.gaugeFull, 0, 0);
+			ctx.restore();
 			break;
 		case 'END':
 			ctx.drawImage(images.gameover, 0, 0);
