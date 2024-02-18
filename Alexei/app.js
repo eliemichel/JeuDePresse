@@ -7,6 +7,11 @@ const config = {
 	countDownDelay: 1000, // ms between each number
 	pixelPerfect: false, // display in the exact 380x720 resolution, whichever the window size and pixel density
 
+	putinPositionX: 580,
+	putinCanonOffset: {
+		x: -25,
+		y: 13,
+	},
 	maximumCorruption: 9, // M€
 	corruptionPerProjectile: 1,
 	initialProjectileVelocity: {
@@ -326,6 +331,9 @@ class App {
 			{ name: "gaugeEmpty", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "gaugeFull", background: [255, 174, 201] },
 			{ name: "gameover", background: null },
+			{ name: "poutineSmall", background: [255, 174, 201] },
+			{ name: "poutineSmallAsleep", background: [255, 174, 201] },
+			{ name: "canon", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -995,14 +1003,16 @@ class App {
 			ctx.drawImage(images[`guillotineLarge0${state.guillotineFrame+1}`], positions.guillotine, 0);
 			break;
 		case 'GAME':
-			let putinSkin = "poutineA";
+			let putinSkin = "poutineSmall";
 			if (state.isPutinAsleep) {
 				const ellapsed = performance.now() - state.putinSleepStarted;
 				if ((ellapsed / config.anim.putinSleeps.blinkDuration) % 1 < 0.5) {
-					putinSkin = "poutineAAsleep";
+					putinSkin = "poutineSmallAsleep";
 				}
 			}
-			ctx.drawImage(images[putinSkin], 0, 0);
+			const img = images[putinSkin];
+			ctx.drawImage(img, config.putinPositionX, config.height - img.height);
+			ctx.drawImage(images.canon, config.putinPositionX + config.putinCanonOffset.x, config.height - img.height + config.putinCanonOffset.y);
 			ctx.drawImage(images.europe, 0, 0);
 			ctx.drawImage(images.shield, shield.position.x, shield.position.y - images.shield.height / 2.0);
 
