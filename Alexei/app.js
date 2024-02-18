@@ -362,6 +362,22 @@ class App {
 		const audioCtx = new AudioContext();
 		this.audio.context = audioCtx;
 
+		// Create mixers for each sound group
+		const throwMixer = new GainNode(audioCtx);
+		throwMixer.connect(audioCtx.destination);
+		throwMixer.gain.value = 0.5;
+		this.audio.mixers.throw = throwMixer;
+
+		const shieldMixer = new GainNode(audioCtx);
+		shieldMixer.connect(audioCtx.destination);
+		shieldMixer.gain.value = 0.7;
+		this.audio.mixers.shield = shieldMixer;
+
+		const globalMixer = new GainNode(audioCtx);
+		globalMixer.connect(audioCtx.destination);
+		this.audio.mixers.global = globalMixer;
+
+
 		return Promise.all(
 			soundInfo.map(async entry => {
 				const url = `sound/${entry.name}.${entry.type}`;
@@ -971,7 +987,14 @@ class App {
 		const audioCtx = this.audio.context;
 		const source = audioCtx.createBufferSource();
 		source.buffer = this.assets.sounds[soundName];
-		source.connect(audioCtx.destination);
+		if (soundName.includes("womanFallQuick")) {
+			source.connect(this.audio.mixers.throw);
+		} else if (soundName.includes("metalHit")) {
+			source.connect(this.audio.mixers.shield);
+		}
+		else {
+			source.connect(this.audio.mixers.global);
+		}
 		source.loop = !!loop;
 		source.start();
 	}
