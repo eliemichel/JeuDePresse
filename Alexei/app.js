@@ -337,20 +337,12 @@ class App {
 	loadAudio() {
 		const { assets } = this;
 		const soundInfo = [
-			//{ name: "guillotine01", type: "mp3" },
-			{ name: "bagCoins01", type: "mp3" },
-			{ name: "bagCoins02", type: "mp3" },
-			{ name: "bagCoins03", type: "mp3" },
-			{ name: "bagCoins04", type: "mp3" },
-			{ name: "bagCoins05", type: "mp3" },
-			{ name: "bagCoins06", type: "mp3" },
-			{ name: "bagCoins07", type: "mp3" },
-			{ name: "metalHit01", type: "mp3" },
-			{ name: "metalHit02", type: "mp3" },
-			{ name: "metalHit03", type: "mp3" },
-			{ name: "metalHit04", type: "mp3" },
-			{ name: "metalHit05", type: "mp3" },
+			...Array.from({length: 7}, (_, i) => ({ name: `bagCoins0${i + 1}` , type: "mp3"})),
+			...Array.from({length: 6}, (_, i) => ({ name: `womanFallQuick0${i + 1}` , type: "mp3"})),
+			{ name: "coinsHit01", type: "mp3" },
+			...Array.from({length: 5}, (_, i) => ({ name: `metalHit0${i + 1}` , type: "mp3"})),
 			{ name: "concreteSmash", type: "mp3" },
+			...Array.from({length: 23}, (_, i) => ({ name: `manPainSilly${(i + 1 + "").padStart(2, "0")}` , type: "mp3"})),
 		]
 
 		const audioCtx = new AudioContext();
@@ -379,6 +371,7 @@ class App {
 			"fullscreen-btn",
 			"fullscreen-btn-img",
 			"about",
+			"menu-music-audio",
 		];
 		for (const name of elementNames) {
 			this.dom[name] = document.getElementById(name);
@@ -416,7 +409,6 @@ class App {
 		});
 
 		// Init DOM-dependent sound
-		/*
 		const audioCtx = this.audio.context;
 		this.dom["menu-music-audio"].loop = true;
 		const track = new MediaElementAudioSourceNode(audioCtx, {
@@ -425,7 +417,6 @@ class App {
 		const menuMusicMixer = new GainNode(audioCtx);
 		track.connect(menuMusicMixer).connect(audioCtx.destination);
 		this.audio.mixers.menuMusic = menuMusicMixer;
-		*/
 
 		document.addEventListener("keydown", this.onKeyDown.bind(this));
 		document.addEventListener("keyup", this.onKeyUp.bind(this));
@@ -746,8 +737,8 @@ class App {
 			corruption: config.corruptionPerProjectile,
 		});
 
-		const soundIndex = Math.floor(Math.random() * 7);
-		this.playSound(`bagCoins0${soundIndex+1}`);
+		this.playSound(`bagCoins0${Math.floor(Math.random() * 7) + 1}`);		
+		this.playSound(`womanFallQuick0${Math.floor(Math.random() * 6) + 1}`);
 	}
 
 	onShieldHit(projectile) {
@@ -759,6 +750,9 @@ class App {
 
 		projectile.velocity.x = Math.abs(projectile.velocity.x);
 		projectile.velocity.y += -config.bounceProjectileVelocity.y * deltaY * 0.02;
+
+		this.playSound(`coinsHit01`);
+		this.playSound(`metalHit0${Math.floor(Math.random() * 5) + 1}`);
 	}
 
 	onEuropeHit(projectile) {
@@ -780,6 +774,8 @@ class App {
 		if (state.isPutinAsleep) return;
 
 		projectile.isDestroyed = true;
+
+		this.playSound(`manPainSilly${Math.floor(Math.random() * 24) + 1}`);
 
 		state.isPutinAsleep = true;
 		await wait(config.putinSleepDuration);
