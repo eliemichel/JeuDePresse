@@ -13,6 +13,7 @@ const config = {
 		x: -0.8,
 		y: -0.6,
 	},
+	putinSleepDuration: 3000, // ms
 	anim: {
 		guillotine: {
 			start: 3000,
@@ -257,6 +258,7 @@ class App {
 				startShieldPosition: { y: 0 },
 				startPosition: { y: 0 },
 			},
+			isPutinAsleep: false,
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
 			difficulty: 0,
@@ -716,7 +718,7 @@ class App {
 		projectile.velocity.y += config.initialProjectileVelocity.y * deltaY * 0.02;
 	}
 
-	onEuropHit(projectile) {
+	onEuropeHit(projectile) {
 		const { state } = this;
 
 		this.playSound(`concreteSmash`);
@@ -727,6 +729,18 @@ class App {
 		if (state.corruption >= config.maximumCorruption) {
 			this.startGameOver();
 		}
+	}
+
+	async onPutinHit(projectile) {
+		const { state } = this;
+
+		if (state.isPutinAsleep) return;
+
+		projectile.isDestroyed = true;
+
+		state.isPutinAsleep = true;
+		await wait(config.putinSleepDuration);
+		state.isPutinAsleep = false;
 	}
 
 	async playHeartBreakAnimation() {
@@ -866,7 +880,7 @@ class App {
 				proj.position.y - images[proj.skin].height / 2.0
 			);
 
-			// Collusion with shield
+			// Collision with shield
 			const collidesShield = !bboxIsEmpty(bboxIntersection(
 				projBbox,
 				bboxOffset(bboxes.shield, shield.position.x, shield.position.y - images.shield.height / 2.0),
@@ -885,7 +899,19 @@ class App {
 			const collidesEurope = lowerLeftHit;
 
 			if (collidesEurope) {
-				this.onEuropHit(proj);
+				this.onEuropeHit(proj);
+			}
+
+			// Collision with Putin
+			const lowerRight = {
+				x: projBbox.maxx,
+				y: projBbox.maxy,
+			};
+			const lowerRightHit = isOpaqueAt(images.poutineA, lowerRight);
+			const collidesPutin = lowerRightHit;
+
+			if (collidesPutin) {
+				this.onPutinHit(proj);
 			}
 		}
 
