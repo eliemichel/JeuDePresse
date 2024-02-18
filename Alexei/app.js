@@ -312,6 +312,19 @@ class App {
 		const { assets } = this;
 		const soundInfo = [
 			//{ name: "guillotine01", type: "mp3" },
+			{ name: "bagCoins01", type: "mp3" },
+			{ name: "bagCoins02", type: "mp3" },
+			{ name: "bagCoins03", type: "mp3" },
+			{ name: "bagCoins04", type: "mp3" },
+			{ name: "bagCoins05", type: "mp3" },
+			{ name: "bagCoins06", type: "mp3" },
+			{ name: "bagCoins07", type: "mp3" },
+			{ name: "metalHit01", type: "mp3" },
+			{ name: "metalHit02", type: "mp3" },
+			{ name: "metalHit03", type: "mp3" },
+			{ name: "metalHit04", type: "mp3" },
+			{ name: "metalHit05", type: "mp3" },
+			{ name: "concreteSmash", type: "mp3" },
 		]
 
 		const audioCtx = new AudioContext();
@@ -681,10 +694,15 @@ class App {
 			velocity: {...config.initialProjectileVelocity},
 			isDestroyed: false,
 		});
+
+		const soundIndex = Math.floor(Math.random() * 7);
+		this.playSound(`bagCoins0${soundIndex+1}`);
 	}
 
 	onEuropHit(projectile) {
 		const { state } = this;
+
+		this.playSound(`concreteSmash`);
 
 		state.corruption += 1;
 		projectile.isDestroyed = true;
