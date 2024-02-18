@@ -335,6 +335,7 @@ class App {
 			{ name: "poutineSmallAsleep", background: [255, 174, 201] },
 			{ name: "canon", background: [255, 174, 201] },
 			{ name: "victoire", background: null },
+			{ name: "lepen", background: [255, 174, 201], computeContentBBox: true },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -765,7 +766,7 @@ class App {
 		velocity.y = -velocity.magnitude * Math.sin(radians);
 
 		state.projectiles.push({
-			skin: "thuneB",
+			skin: "lepen",
 			position: { x: 600, y: 270 },
 			velocity,
 			isDestroyed: false,
