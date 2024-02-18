@@ -792,7 +792,7 @@ class App {
 
 		projectile.isDestroyed = true;
 
-		this.playSound(`manPainSilly${Math.floor(Math.random() * 24) + 1}`);
+		this.playSound(`manPainSilly${Math.floor(Math.random() * 23) + 1}`);
 
 		state.isPutinAsleep = true;
 		state.putinSleepStarted = performance.now();
