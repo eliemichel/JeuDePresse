@@ -12,8 +12,10 @@ const config = {
 		x: -25,
 		y: 13,
 	},
+	startCorruption: 4,
 	maximumCorruption: 9, // M€
 	corruptionPerProjectile: 1,
+	uncorruptionPerProjectile: 1,
 	initialProjectileVelocity: {
 		min: {
 			angle: 20.0,
@@ -272,7 +274,8 @@ class App {
 		this.state = {
 			needRedraw: true,
 			scene: 'MENU', // of [ 'MENU', 'GAME', 'END' ]
-			corruption: 0,
+			victory: false,
+			corruption: config.startCorruption,
 			shield: {
 				position: { x: 360, y: config.height / 2 },
 				movingUp: false,
@@ -323,9 +326,6 @@ class App {
 		const imageInfo = [
 			{ name: "background", background: null },
 			{ name: "shield", background: [255, 174, 201], computeContentBBox: true },
-			{ name: "poutineA", background: [239, 228, 176] },
-			{ name: "poutineB", background: [239, 228, 176] },
-			{ name: "poutineAAsleep", background: [239, 228, 176] },
 			{ name: "thuneB", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "europe", background: [255, 174, 201] },
 			{ name: "gaugeEmpty", background: [255, 174, 201], computeContentBBox: true },
@@ -334,6 +334,7 @@ class App {
 			{ name: "poutineSmall", background: [255, 174, 201] },
 			{ name: "poutineSmallAsleep", background: [255, 174, 201] },
 			{ name: "canon", background: [255, 174, 201] },
+			{ name: "victoire", background: null },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -705,7 +706,8 @@ class App {
 
 	restartGameAfterHit() {
 		const { state } = this;
-		state.corruption = 0;
+		state.victory = false;
+		state.corruption = config.startCorruption;
 		state.projectiles = [];
 		state.shield.position = { x: 280, y: config.height / 2 };
 		state.putinSleepStarted = null;
@@ -768,6 +770,7 @@ class App {
 			velocity,
 			isDestroyed: false,
 			corruption: config.corruptionPerProjectile,
+			uncorruption: config.uncorruptionPerProjectile,
 		});
 
 		this.playSound(`bagCoins0${Math.floor(Math.random() * 7) + 1}`);		
@@ -806,7 +809,12 @@ class App {
 
 		if (state.isPutinAsleep) return;
 
+		state.corruption -= projectile.uncorruption;
 		projectile.isDestroyed = true;
+
+		if (state.corruption <= 0) {
+			this.startVictory();
+		}
 
 		this.playSound(`manPainSilly${Math.floor(Math.random() * 23) + 1}`);
 
@@ -845,6 +853,12 @@ class App {
 	}
 
 	startGameOver() {
+		this.state.victory = false;
+		this.setScene('END');
+	}
+
+	startVictory() {
+		this.state.victory = true;
 		this.setScene('END');
 	}
 
@@ -964,11 +978,20 @@ class App {
 			}
 
 			// Collision with Putin
-			const lowerRight = {
-				x: projBbox.maxx,
-				y: projBbox.maxy,
+			const poutinePosition = {
+				x: config.putinPositionX,
+				y: config.height - images.poutineSmall.height,
 			};
-			const lowerRightHit = isOpaqueAt(images.poutineA, lowerRight);
+			const localProjBbox = bboxOffset(
+				projBbox,
+				-poutinePosition.x,
+				-poutinePosition.y,
+			);
+			const lowerRight = {
+				x: localProjBbox.maxx,
+				y: localProjBbox.maxy,
+			};
+			const lowerRightHit = isOpaqueAt(images.poutineSmall, lowerRight);
 			const hasBounced = proj.velocity.x > 0;
 			const collidesPutin = hasBounced && lowerRightHit;
 
@@ -1057,7 +1080,7 @@ class App {
 			ctx.restore();
 			break;
 		case 'END':
-			ctx.drawImage(images.gameover, 0, 0);
+			ctx.drawImage(state.victory ? images.victoire : images.gameover, 0, 0);
 			break;
 		}
 	}
