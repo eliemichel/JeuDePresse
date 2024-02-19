@@ -87,6 +87,10 @@ const config = {
 	},
 	menuMusicVolume: 0.5,
 	initialVictory: false,
+	loadBar: {
+		width: 200,
+		height: 5,
+	},
 
 	// == DEBUG ==
 	//countDownDelay: 100,
@@ -300,6 +304,7 @@ class App {
 			needRedraw: true,
 			audioContextAllowed: false,
 			scene: 'MENU', // of [ 'MENU', 'GAME', 'END' ]
+			loading: { done: 0, total: 0 },
 			victory: config.initialVictory,
 			corruption: config.startCorruption,
 			shield: {
@@ -341,18 +346,31 @@ class App {
 		}).then(this.onDomContentLoaded.bind(this));
 
 		const $images = this.loadImages();
-		const $audio = this.loadAudio();
+
+		// Actually wait for images to be loaded before loading audio
+		//const $audio = this.loadAudio();
+		const $audio = $images.then(() => this.loadAudio())
 
 		Promise.all([
 			$dom,
 			$images,
-			$audio,
+			// $audio, actually don't wait for audio before starting
 		]).then(() => {
 			this.start();
+		});
+
+		Promise.all([
+			$dom,
+			$audio
+		]).then(() => {
+			this.initDomDependentAudio();
 		})
 	}
 
 	loadImages() {
+		const { state, assets } = this;
+		const { images, bboxes } = assets;
+
 		const imageInfo = [
 			{ name: "shield", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "thuneB", background: [255, 174, 201], computeContentBBox: true },
@@ -405,11 +423,21 @@ class App {
 			{ name: "soundOnHover", background: [255, 174, 201] },
 			{ name: "soundOff", background: [255, 174, 201] },
 			{ name: "soundOffHover", background: [255, 174, 201] },
-		]
+		];
+
+		state.loading.total += imageInfo.length;
+		this.drawLoading();
+
 		return Promise.all(
-			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
+			imageInfo.map(entry =>
+				fetchImage(`images/${entry.name}.png`)
+				.then(img => {
+					++state.loading.done;
+					this.drawLoading();
+					return img;
+				})
+			)
 		).then(loadedImages => {
-			const { images, bboxes } = this.assets;
 			for (const [image, entry] of zip(loadedImages, imageInfo)) {
 				images[entry.name] = replaceColorByAlpha(image, entry.background);
 				if (entry.computeContentBBox) {
@@ -463,10 +491,12 @@ class App {
 	// If only there was a browser event we could listen for when navigator.userActivation.hasBeenActive changes...
 	tryAllowingAudioContext() {
 		const { state, audio } = this;
-		if (!state.audioContextAllowed) {
+		if (audio.context && !state.audioContextAllowed) {
 			audio.context.resume().then(() => {
-				state.audioContextAllowed = true;
-				this.onAudioContextAllowed();
+				if (!state.audioContextAllowed) {
+					state.audioContextAllowed = true;
+					this.onAudioContextAllowed();
+				}
 			});
 		}
 	}
@@ -509,6 +539,7 @@ class App {
 		this.dom.canvas.height = config.height;
 		this.context2d = this.dom.canvas.getContext("2d");
 		this.context2d.imageSmoothingEnabled = false;
+		this.drawLoading();
 
 		this.dom["play-btn"].addEventListener("click", e => {
 			this.startTransitionToGame();
@@ -549,16 +580,6 @@ class App {
 			}
 		});
 
-		// Init DOM-dependent sound
-		const audioCtx = this.audio.context;
-		this.dom["menu-music-audio"].loop = true;
-		const track = new MediaElementAudioSourceNode(audioCtx, {
-			mediaElement: this.dom["menu-music-audio"],
-		});
-		const menuMusicMixer = new GainNode(audioCtx);
-		track.connect(menuMusicMixer).connect(audioCtx.destination);
-		this.audio.mixers.menuMusic = menuMusicMixer;
-
 		const eventHandlers = [
 			[ 'keydown', this.onKeyDown ],
 			[ 'keyup', this.onKeyUp ],
@@ -579,6 +600,23 @@ class App {
 		}
 		new ResizeObserver(this.onResize.bind(this)).observe(this.dom.container);
 		this.onResize();
+	}
+
+	initDomDependentAudio() {
+		const audioCtx = this.audio.context;
+		this.dom["menu-music-audio"].loop = true;
+		const track = new MediaElementAudioSourceNode(audioCtx, {
+			mediaElement: this.dom["menu-music-audio"],
+		});
+		const menuMusicMixer = new GainNode(audioCtx);
+		track.connect(menuMusicMixer).connect(audioCtx.destination);
+		this.audio.mixers.menuMusic = menuMusicMixer;
+
+		if (this.state.audioContextAllowed) {
+			this.fadeInMenuMusic();
+		} else {
+			this.tryAllowingAudioContext();
+		}
 	}
 
 	onResize() {
@@ -795,6 +833,7 @@ class App {
 	async fadeInMenuMusic() {
 		if (!this.state.audioContextAllowed) return;
 		const { menuMusic } = this.audio.mixers;
+		if (!menuMusic) return;
 		const sound = this.dom["menu-music-audio"];
 
 		menuMusic.gain.value = 0.0;
@@ -808,6 +847,7 @@ class App {
 
 	async fadeOutMenuMusic() {  // NOTE not used in current game
 		const { menuMusic } = this.audio.mixers;
+		if (!menuMusic) return;
 		const sound = this.dom["menu-music-audio"];
 
 		for (let gain = menuMusic.gain.value ; gain >= 0.0 ; gain -= 0.02) {
@@ -1213,8 +1253,11 @@ class App {
 		const audioCtx = this.audio.context;
 		if (audioCtx.state != 'running') return;
 
+		const soundData = this.assets.sounds[soundName];
+		if (!soundData) return;
+
 		const source = audioCtx.createBufferSource();
-		source.buffer = this.assets.sounds[soundName];
+		source.buffer = soundData;
 		if (soundName.includes("womanFallQuick")) {
 			source.connect(this.audio.mixers.throw);
 		} else if (soundName.includes("metalHit")) {
@@ -1236,6 +1279,34 @@ class App {
 		}
 	}
 
+	drawLoading() {
+		const ctx = this.context2d;
+		const { loading } = this.state;
+		if (!ctx) return;
+
+		ctx.fillStyle = "rgb(239, 228, 176)";
+		ctx.fillRect(0, 0, config.width, config.height);
+
+		ctx.fillStyle = "rgb(185, 122, 87)";
+		ctx.fillRect(
+			(config.width - config.loadBar.width) / 2,
+			(config.height - config.loadBar.height) / 2,
+			config.loadBar.width,
+			config.loadBar.height
+		);
+
+		if (loading.total > 0 && loading.done > 0) {
+			const fac = loading.done / loading.total;
+			ctx.fillStyle = "rgb(255, 127, 39)";
+			ctx.fillRect(
+				(config.width - config.loadBar.width) / 2,
+				(config.height - config.loadBar.height) / 2,
+				config.loadBar.width * fac,
+				config.loadBar.height
+			);
+		}
+	}
+
 	draw() {
 		const { state } = this;
 		const { scene, shield, countDown } = state;
@@ -1248,7 +1319,7 @@ class App {
 		switch (scene) {
 
 		case 'MENU':
-			const positions ={
+			const positions = {
 				flags: 0,
 				title: 0,
 				putin: 0,
