@@ -1204,7 +1204,7 @@ class App {
 			}
 		}
 
-		state.fx = state.fx.filter(fx => !fx.isDestroyed);
+		state.fx = state.fx.filter(fx => !fx.isDestroyed && fx.position.y < 2 * config.height);
 
 		state.needRedraw = true;
 	}
