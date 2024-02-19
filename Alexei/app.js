@@ -67,6 +67,9 @@ const config = {
 			duration: 3999,
 			blinkDuration: 1000,
 		},
+		putinLaughs: {
+			period: 300,
+		},
 	},
 	gravity: 0.0025 * 0.5,
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Alexei/about",
@@ -75,15 +78,11 @@ const config = {
 		livesMargin: 5,
 	},
 	menuMusicVolume: 0.5,
-	difficultyIncrementTime: 5000,
-	ennemySkinFromType: {
-		'GUILLOTINE': "guillotine",
-		'HEART': "heartMob",
-	},
+	initialVictory: false,
 
 	// == DEBUG ==
 	//countDownDelay: 100,
-	startScene: 'MENU',
+	startScene: 'END',
 	//defaultLives: 10,
 	//difficultyIncrementTime: 5000,
 	// ==  ==
@@ -284,7 +283,7 @@ class App {
 		this.state = {
 			needRedraw: true,
 			scene: 'MENU', // of [ 'MENU', 'GAME', 'END' ]
-			victory: false,
+			victory: config.initialVictory,
 			corruption: config.startCorruption,
 			shield: {
 				position: { x: 360, y: config.height / 2 },
@@ -301,6 +300,7 @@ class App {
 			isPutinAsleep: false,
 			putinSleepStarted: null,
 			showHelpHud: false,
+			poutineSkin: "poutine01",
 
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
@@ -344,6 +344,8 @@ class App {
 			{ name: "gaugeFull", background: [255, 174, 201] },
 			{ name: "corruption", background: [255, 174, 201] },
 			{ name: "gameover", background: null },
+			{ name: "poutine01", background: [255, 174, 201] },
+			{ name: "poutine02", background: [255, 174, 201] },
 			{ name: "poutineSmall", background: [255, 174, 201] },
 			{ name: "poutineSmallAsleep", background: [255, 174, 201] },
 			{ name: "canon", background: [255, 174, 201] },
@@ -790,10 +792,28 @@ class App {
 
 	startEnd() {
 		this.dom["back-btn"].style.display = 'block';
+
+		// Poutine laughs
+		if (!this.state.victory) {
+			this.startPutinLaugh();
+		}
 	}
 
 	stopEnd() {
 		this.dom["back-btn"].style.display = 'none';
+	}
+
+	async startPutinLaugh() {
+		const { state } = this;
+		const { period } = config.anim.putinLaughs;
+		while (state.scene == 'END') {
+			await wait(period / 2);
+			state.poutineSkin = "poutine02";
+			state.needRedraw = true;
+			await wait(period / 2);
+			state.poutineSkin = "poutine01";
+			state.needRedraw = true;
+		}
 	}
 
 	async startCountDown() {
@@ -1135,6 +1155,9 @@ class App {
 		const { images, bboxes } = this.assets;
 		const ctx = this.context2d;
 
+		ctx.fillStyle = "rgb(239, 228, 176)";
+		ctx.fillRect(0, 0, config.width, config.height);
+
 		switch (scene) {
 
 		case 'MENU':
@@ -1155,8 +1178,6 @@ class App {
 				positions.title = -Math.max(time - 0.3, 0.0) * speed;
 			}
 
-			ctx.fillStyle = "rgb(239, 228, 176)";
-			ctx.fillRect(0, 0, config.width, config.height);
 			ctx.drawImage(images.menuFlags, 0, positions.flags);
 			ctx.drawImage(images.menuTitle, 0, positions.title);
 			ctx.drawImage(images.menuPutin, 0, positions.putin);
@@ -1164,9 +1185,6 @@ class App {
 			break;
 
 		case 'GAME':
-			ctx.fillStyle = "rgb(239, 228, 176)";
-			ctx.fillRect(0, 0, config.width, config.height);
-
 			let putinSkin = "poutineSmall";
 			if (state.isPutinAsleep) {
 				const ellapsed = performance.now() - state.putinSleepStarted;
@@ -1223,7 +1241,13 @@ class App {
 			break;
 
 		case 'END':
-			ctx.drawImage(state.victory ? images.victoire : images.gameover, 0, 0);
+			if (state.victory) {
+				ctx.drawImage(images.victoire, 0, 0);
+			} else {
+				ctx.drawImage(images.gameover, 0, -50);
+				const img = images[state.poutineSkin];
+				ctx.drawImage(img, (config.width - img.width) / 2, 195);
+			}
 			break;
 		}
 	}
