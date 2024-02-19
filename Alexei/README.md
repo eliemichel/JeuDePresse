@@ -3,7 +3,7 @@ Alexeï
 
 Jeu de presse #**002** *18 février 2024*
 
-[**Jouer !**](https://eliemichel.github.io/JeuDePresse/Alexei)
+[**Jouer !**](https://www.exppad.com/games/JeuDePresse/Alexei/) ([Lien alternatif](https://eliemichel.github.io/JeuDePresse/Alexei))
 
 En homage à Alexeï Navalny, continuez son combat contre la corruption en repoussant les assauts que Vladimir Poutine lance à grand coup de personnages politiques pleins de billets.
 
