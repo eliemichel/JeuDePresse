@@ -1022,36 +1022,45 @@ class App {
 			}
 
 			// Collision with Europe
-			const lowerLeft = {
-				x: projBbox.minx,
-				y: projBbox.maxy,
-			};
-			const lowerLeftHit = isOpaqueAt(images.europe, lowerLeft);
-			const collidesEurope = lowerLeftHit;
+			{
+				const lowerLeft = {
+					x: projBbox.minx,
+					y: projBbox.maxy,
+				};
+				const lowerLeftHit = isOpaqueAt(images.europe, lowerLeft);
+				const collidesEurope = lowerLeftHit;
 
-			if (collidesEurope) {
-				this.onEuropeHit(proj);
+				if (collidesEurope) {
+					this.onEuropeHit(proj);
+				}
 			}
 
 			// Collision with Putin
-			const poutinePosition = {
-				x: config.putinPositionX,
-				y: config.height - images.poutineSmall.height,
-			};
-			const localProjBbox = bboxOffset(
-				projBbox,
-				-poutinePosition.x,
-				-poutinePosition.y,
-			);
-			const lowerRight = {
-				x: localProjBbox.maxx,
-				y: localProjBbox.maxy,
-			};
-			const lowerRightHit = isOpaqueAt(images.poutineSmall, lowerRight);
-			const collidesPutin = hasBounced && lowerRightHit;
+			{
+				const poutinePosition = {
+					x: config.putinPositionX,
+					y: config.height - images.poutineSmall.height,
+				};
+				const localProjBbox = bboxOffset(
+					projBbox,
+					-poutinePosition.x,
+					-poutinePosition.y,
+				);
+				const lowerRight = {
+					x: localProjBbox.maxx,
+					y: localProjBbox.maxy,
+				};
+				const lowerLeft = {
+					x: localProjBbox.minx,
+					y: localProjBbox.maxy,
+				};
+				const lowerRightHit = isOpaqueAt(images.poutineSmall, lowerRight);
+				const lowerLeftHit = isOpaqueAt(images.poutineSmall, lowerLeft);
+				const collidesPutin = hasBounced && (lowerRightHit || lowerLeftHit);
 
-			if (collidesPutin) {
-				this.onPutinHit(proj);
+				if (collidesPutin) {
+					this.onPutinHit(proj);
+				}
 			}
 		}
 
