@@ -45,6 +45,20 @@ const config = {
 			offset: { x: 40 },
 			frameDuration: 50,
 		},
+		debris: {
+			startVelocity: {
+				min: {
+					x: -0.6,
+					y: -0.8,
+					angle: -0.6,
+				},
+				max: {
+					x: -0.1,
+					y: -0.4,
+					angle: -0.2,
+				},
+			},
+		},
 		transitionToGame: {
 			duration: 1100,
 			speed: 400,
@@ -337,6 +351,9 @@ class App {
 			{ name: "impact01", background: [255, 174, 201] },
 			{ name: "impact02", background: [255, 174, 201] },
 			{ name: "impact03", background: [255, 174, 201] },
+			{ name: "debris01", background: [255, 174, 201] },
+			{ name: "debris02", background: [255, 174, 201] },
+			{ name: "debris03", background: [255, 174, 201] },
 
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
@@ -743,6 +760,7 @@ class App {
 		state.victory = false;
 		state.corruption = config.startCorruption;
 		state.projectiles = [];
+		state.fx = [];
 		state.shield.position = { x: 280, y: config.height / 2 };
 		state.putinSleepStarted = null;
 	}
@@ -827,6 +845,7 @@ class App {
 		// Impact effect
 		const fx = {
 			skin: "impact01",
+			dynamic: 'NONE',
 			position: {
 				x: shield.position.x + config.anim.impact.offset.x,
 				y: projectile.position.y,
@@ -855,6 +874,25 @@ class App {
 		if (state.corruption >= config.maximumCorruption) {
 			this.startGameOver();
 		}
+
+		// Debris effect
+		const { min, max } = config.anim.debris.startVelocity;
+		const fx = {
+			skin: `debris0${Math.floor(Math.random() * 3) + 1}`,
+			dynamic: 'GRAVITY',
+			position: {
+				x: projectile.position.x,
+				y: projectile.position.y,
+			},
+			angle: 0,
+			velocity: {
+				x: lerp(min.x, max.x, Math.random()),
+				y: lerp(min.y, max.y, Math.random()),
+				angle: lerp(min.angle, max.angle, Math.random()),
+			},
+			isDestroyed: false,
+		};
+		state.fx.push(fx);
 	}
 
 	async onPutinHit(projectile) {
@@ -1067,6 +1105,15 @@ class App {
 		// Remove ennemies that are below the screen
 		state.projectiles = state.projectiles.filter(proj => !proj.isDestroyed && proj.position.y < config.height);
 
+		for (const fx of state.fx) {
+			if (fx.dynamic == 'GRAVITY') {
+				fx.position.x += fx.velocity.x * dt;
+				fx.position.y += fx.velocity.y * dt;
+				fx.velocity.y += config.gravity * dt;
+				fx.angle += fx.velocity.angle * dt;
+			}
+		}
+
 		state.fx = state.fx.filter(fx => !fx.isDestroyed);
 
 		state.needRedraw = true;
@@ -1146,7 +1193,13 @@ class App {
 
 			for (const fx of state.fx) {
 				const img = images[fx.skin];
-				ctx.drawImage(img, fx.position.x - img.width / 2.0, fx.position.y - img.height / 2.0);
+				ctx.save();
+				ctx.translate(fx.position.x, fx.position.y);
+				if (fx.angle) {
+					ctx.rotate(fx.angle * Math.PI / 180);
+				}
+				ctx.drawImage(img, -img.width / 2.0, -img.height / 2.0);
+				ctx.restore();
 			}
 
 			// HUD
