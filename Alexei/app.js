@@ -71,6 +71,7 @@ const config = {
 			period: 300,
 		},
 	},
+	projectileBboxShrink: 10,
 	digits: {
 		width: 8*3,
 		height: 8*4,
@@ -146,6 +147,15 @@ function bboxOffset(bbox, x, y) {
 	};
 }
 
+function bboxShrink(bbox, m) {
+	return {
+		minx: bbox.minx + m,
+		miny: bbox.miny + m,
+		maxx: bbox.maxx - m,
+		maxy: bbox.maxy - m,
+	};
+}
+
 function bboxFromImage(img, x, y) {
 	return {
 		minx: x,
@@ -162,6 +172,23 @@ function bboxIntersection(a, b) {
 		miny: Math.max(a.miny, b.miny),
 		maxy: Math.min(a.maxy, b.maxy),
 	}
+}
+
+function bboxIsEmpty(bbox) {
+	return (
+		(bbox.maxx - bbox.minx) <= 0.0 ||
+		(bbox.maxy - bbox.miny) <= 0.0
+	);
+}
+
+// Draw a bbox
+function bboxStroke(ctx, bbox) {
+	ctx.strokeRect(
+		bbox.minx + 0.5,
+		bbox.miny + 0.5,
+		bbox.maxx - bbox.minx,
+		bbox.maxy - bbox.miny,
+	);
 }
 
 // BBox of the non-transparent content of the image
@@ -199,22 +226,6 @@ function isOpaqueAt(canvas, position) {
 	const { x, y } = position;
 	if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) return false;
 	return canvas.getContext("2d").getImageData(x, y, 1, 1).data[3] > 0
-}
-
-function bboxIsEmpty(bbox) {
-	return (
-		(bbox.maxx - bbox.minx) <= 0.0 ||
-		(bbox.maxy - bbox.miny) <= 0.0
-	);
-}
-
-function bboxStroke(ctx, bbox) {
-	ctx.strokeRect(
-		bbox.minx + 0.5,
-		bbox.miny + 0.5,
-		bbox.maxx - bbox.minx,
-		bbox.maxy - bbox.miny,
-	);
 }
 
 function setButtonImage(element, image) {
@@ -1122,11 +1133,11 @@ class App {
 		// Collision detection
 		for (const proj of projectiles) {
 			const hasBounced = proj.velocity.x > 0;
-			const projBbox = bboxOffset(
+			const projBbox = bboxShrink(bboxOffset(
 				bboxes[proj.skin],
 				proj.position.x - images[proj.skin].width / 2.0,
 				proj.position.y - images[proj.skin].height / 2.0
-			);
+			), config.projectileBboxShrink);
 
 			// Collision with shield
 			const collidesShield = !hasBounced && !bboxIsEmpty(bboxIntersection(
