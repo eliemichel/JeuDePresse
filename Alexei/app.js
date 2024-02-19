@@ -83,6 +83,7 @@ const config = {
 	// == DEBUG ==
 	//countDownDelay: 100,
 	startScene: 'END',
+	initialVictory: true,
 	//defaultLives: 10,
 	//difficultyIncrementTime: 5000,
 	// ==  ==
@@ -366,6 +367,8 @@ class App {
 			{ name: "1", background: [255, 174, 201] },
 			{ name: "2", background: [255, 174, 201] },
 			{ name: "3", background: [255, 174, 201] },
+			{ name: "inmemoriam", background: [255, 174, 201] },
+			{ name: "continuons", background: [255, 174, 201] },
 
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
@@ -1242,7 +1245,11 @@ class App {
 
 		case 'END':
 			if (state.victory) {
-				ctx.drawImage(images.victoire, 0, 0);
+				ctx.drawImage(images.victoire, 0, 150);
+				const img = images.inmemoriam;
+				ctx.drawImage(img, (config.width - img.width) / 2, 0);
+				const img2 = images.continuons;
+				ctx.drawImage(img2, (config.width - img2.width) / 2, 195);
 			} else {
 				ctx.drawImage(images.gameover, 0, -50);
 				const img = images[state.poutineSkin];
