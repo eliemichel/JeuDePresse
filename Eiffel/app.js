@@ -109,22 +109,8 @@ function setupButton(args) {
 
 class App {
 	constructor() {
-		this.state = {
-			needRedraw: true,
-			pendingVictoryCheck: null,
-			victory: config.victory,
-			scene: 'GAME', // of [ 'GAME', 'END' ]
-			drag: {
-				active: false,
-				previousMouse: null,
-			},
-			drawingCanvas: null,
-			drawing: null,
-			brush: {
-				x: config.initialBrushPosition.x,
-				y: config.initialBrushPosition.y
-			},
-		};
+		this.resetState();
+		this.state.victory = config.victory;
 		this.assets = {
 			images: {},
 			bboxes: {},
@@ -136,21 +122,6 @@ class App {
 			context: null,
 			mixers: {},
 		};
-
-		// Init drawing
-		{
-			const canvas = document.createElement("canvas");
-			canvas.width = config.width;
-			canvas.height = config.height;
-			const ctx = canvas.getContext("2d");
-			ctx.fillStyle = "rgba(0,0,0,0.0)";
-			ctx.fillRect(0, 0, config.width, config.height);
-			ctx.strokeStyle = "rgba(255, 127, 39, 1.0)";
-			ctx.lineWidth = config.drawingWidth;
-			ctx.lineCap = 'round';
-			this.state.drawingCanvas = canvas;
-			this.state.drawing = ctx;
-		}
 
 		const $dom = new Promise(resolve => {
 			document.addEventListener("DOMContentLoaded", resolve());
@@ -176,6 +147,40 @@ class App {
 		})
 	}
 
+	resetState() {
+		this.state = {
+			needRedraw: true,
+			pendingVictoryCheck: null,
+			victory: false,
+			scene: 'GAME', // of [ 'GAME', 'END' ]
+			drag: {
+				active: false,
+				previousMouse: null,
+			},
+			drawingCanvas: null,
+			drawing: null,
+			brush: {
+				x: config.initialBrushPosition.x,
+				y: config.initialBrushPosition.y
+			},
+		};
+
+		// Init drawing
+		{
+			const canvas = document.createElement("canvas");
+			canvas.width = config.width;
+			canvas.height = config.height;
+			const ctx = canvas.getContext("2d");
+			ctx.fillStyle = "rgba(0,0,0,0.0)";
+			ctx.fillRect(0, 0, config.width, config.height);
+			ctx.strokeStyle = "rgba(255, 127, 39, 1.0)";
+			ctx.lineWidth = config.drawingWidth;
+			ctx.lineCap = 'round';
+			this.state.drawingCanvas = canvas;
+			this.state.drawing = ctx;
+		}
+	}
+
 	loadImages() {
 		const { images, bboxes } = this.assets;
 
@@ -198,6 +203,9 @@ class App {
 
 			{ name: "fullscreen", background: [255, 174, 201] },
 			{ name: "fullscreenHover", background: [255, 174, 201] },
+			{ name: "play", background: [255, 174, 201] },
+			{ name: "playHover", background: [255, 174, 201] },
+			{ name: "playPressed", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(async entry => {
@@ -300,7 +308,9 @@ class App {
 		this.context2d.imageSmoothingEnabled = false;
 
 		this.dom["play-btn"].addEventListener("click", e => {
-			this.startTransitionToGame();
+			e.stopPropagation();
+			this.resetState();
+			this.dom["play-btn"].style.display = 'none';
 		});
 
 		this.dom["back-btn"].addEventListener("click", e => {
@@ -485,6 +495,7 @@ class App {
 		if (this.isVictory()) {
 			console.log('VICTORY');
 			this.state.victory = true;
+			this.dom["play-btn"].style.display = 'block';
 		}
 	}
 
@@ -507,11 +518,12 @@ class App {
 			top: 0,
 			right: 0
 		});
-		/*
 		autoSetupButton("play", {
-			top: 240,
-			right: 30
+			bottom: 30,
+			left: (config.width - 200) / 2 - 10,
 		});
+		this.dom["play-btn"].style.display = this.state.victory ? 'block' : 'none';
+		/*
 		autoSetupButton("back", {
 			top: 0,
 			left: 0
@@ -534,19 +546,6 @@ class App {
 
 	stopGame() {
 		this.dom["fullscreen-btn"].style.display = 'none';
-	}
-
-	startEnd() {
-		this.dom["back-btn"].style.display = 'block';
-	}
-
-	stopEnd() {
-		this.dom["back-btn"].style.display = 'none';
-	}
-
-	startGameOver() {
-
-		this.setScene('END');
 	}
 
 	setScene(newScene) {
