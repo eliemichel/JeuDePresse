@@ -8,7 +8,9 @@ L'objectif est de produire **très rapidement** un objet interactif traitant d'a
 Explorez les différents dossier pour y découvrir tous ces jeux/jouets !
 
  - **001** [Robert](https://www.exppad.com/games/JeuDePresse/Robert) *11 février 2024* [[lien alternatif]](https://eliemichel.github.io/JeuDePresse/Robert) [[source]](https://github.com/eliemichel/JeuDePresse/tree/main/Robert)
- - **002** [Alexeï](https://www.exppad.com/games/JeuDePresse/Robert/Alexei) *19 février 2024* [[lien alternatif]](https://eliemichel.github.io/JeuDePresse/Alexei) [[source]](https://github.com/eliemichel/JeuDePresse/tree/main/Alexei)
+ - **002** [Alexeï](https://www.exppad.com/games/JeuDePresse/Alexei) *19 février 2024* [[lien alternatif]](https://eliemichel.github.io/JeuDePresse/Alexei) [[source]](https://github.com/eliemichel/JeuDePresse/tree/main/Alexei)
+
+**NB** *Le lien alternatif est automatiquement mis à jour, mais est parfois plus lent à charger.*
 
 Auteurs
 -------
