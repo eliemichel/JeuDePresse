@@ -13,8 +13,8 @@ const config = {
 	},
 	startCorruption: 4,
 	maximumCorruption: 9, // M€
-	corruptionPerProjectile: 1,
-	uncorruptionPerProjectile: 1,
+	corruptionPerProjectile: 0.5,
+	uncorruptionPerProjectile: 0.5,
 	initialProjectileVelocity: {
 		min: {
 			angle: 20.0,
@@ -70,6 +70,13 @@ const config = {
 		putinLaughs: {
 			period: 300,
 		},
+	},
+	digits: {
+		width: 8*3,
+		height: 8*4,
+		padding: 2,
+		variants: 2,
+		margin: -6,
 	},
 	gravity: 0.0025 * 0.5,
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Alexei/about",
@@ -258,25 +265,22 @@ function setupButton(args) {
 	}
 }
 
-function samplePatternIndex(difficulty, distributions) {
-	let likelihoods = [];
-	for (const dist of distributions) {
-		if (dist.fromDifficulty > difficulty) {
-			break;
-		}
-		likelihoods = dist.likelihoods;
+class PseudoRandomGenerator {
+	constructor(seed) {
+		this.value = seed;
 	}
-	const total = likelihoods.reduce((s, x) => s + x, 0);
-	let sample = Math.floor(Math.random() * total);
-	let patternIdx = 0;
-	for (const l of likelihoods) {
-		sample -= l;
-		if (sample < 0) {
-			break;
-		}
-		patternIdx += 1;
+
+	mulberry32(a) {
+		var t = a += 0x6D2B79F5;
+		t = Math.imul(t ^ t >>> 15, t | 1);
+		t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+		return ((t ^ t >>> 14) >>> 0) / 4294967296;
 	}
-	return Math.min(patternIdx, likelihoods.length - 1);
+
+	random() {
+		this.value = this.mulberry32(this.value);
+		return this.value;
+	}
 }
 
 class App {
@@ -370,6 +374,9 @@ class App {
 			{ name: "3", background: [255, 174, 201] },
 			{ name: "inmemoriam", background: [255, 174, 201] },
 			{ name: "continuons", background: [255, 174, 201] },
+			{ name: "digits", background: [255, 174, 201] },
+			{ name: "dot", background: [255, 174, 201] },
+			{ name: "euro", background: [255, 174, 201] },
 
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
@@ -1251,6 +1258,7 @@ class App {
 			ctx.drawImage(images.menuTitle, 0, positions.title);
 			ctx.drawImage(images.menuPutin, 0, positions.putin);
 			ctx.drawImage(images.menuLepen, positions.lepen.x, positions.lepen.y);
+
 			break;
 
 		case 'GAME':
@@ -1285,6 +1293,7 @@ class App {
 
 			// HUD
 			ctx.drawImage(images.corruption, 236, 0);
+			this.drawNumber(ctx, state.corruption, 236 + images.corruption.width + 5, 8);
 			ctx.drawImage(images.gaugeEmpty, 0, 0);
 
 			ctx.save();
@@ -1323,6 +1332,38 @@ class App {
 			}
 			break;
 		}
+	}
+
+	// digit is in {0, ..., 9}
+	drawDigit(ctx, digit, rand, x, y) {
+		const { images } = this.assets;
+		const { width, height, padding, variants, margin } = config.digits;
+		const variantIdx = Math.floor(rand.random() * variants);
+		ctx.drawImage(
+			images.digits,
+			digit * width + padding, variantIdx * height + padding, width - padding, height - padding,
+			x + margin, y, width - padding, height - padding
+		);
+		return x + width - padding + margin;
+	}
+
+	drawChar(ctx, charName, x, y) {
+		const { images } = this.assets;
+		ctx.drawImage(images[charName], x, y);
+		return x + images[charName].width;
+	}
+
+	drawNumber(ctx, number, x, y) {
+		let c = x;
+		let rand = new PseudoRandomGenerator(Math.floor(number * 1000000));
+		for (const char of String(number)) {
+			if (char == ".") {
+				c = this.drawChar(ctx, "dot", c, y);
+			} else {
+				c = this.drawDigit(ctx, parseInt(char), rand, c, y);
+			}
+		}
+		c = this.drawChar(ctx, "euro", c, y);
 	}
 }
 
