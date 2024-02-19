@@ -63,6 +63,10 @@ const config = {
 			duration: 1100,
 			speed: 400,
 		},
+		helpHud: {
+			duration: 3999,
+			blinkDuration: 1000,
+		},
 	},
 	gravity: 0.0025 * 0.5,
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Alexei/about",
@@ -296,6 +300,7 @@ class App {
 			},
 			isPutinAsleep: false,
 			putinSleepStarted: null,
+			showHelpHud: false,
 
 			transitionToGameStartTime: null,
 			previousFrameTime: performance.now(),
@@ -354,6 +359,8 @@ class App {
 			{ name: "debris01", background: [255, 174, 201] },
 			{ name: "debris02", background: [255, 174, 201] },
 			{ name: "debris03", background: [255, 174, 201] },
+			{ name: "arrowUp", background: [255, 174, 201] },
+			{ name: "arrowDown", background: [255, 174, 201] },
 
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
@@ -532,12 +539,15 @@ class App {
 	}
 
 	onKeyDown(ev) {
-		const { shield } = this.state;
+		const { state } = this;
+		const { shield } = state;
 		if (ev.key == 'ArrowUp') {
 			shield.movingUp = true;
+			state.showHelpHud = false;
 		}
 		if (ev.key == 'ArrowDown') {
 			shield.movingDown = true;
+			state.showHelpHud = false;
 		}
 
 		// Debug
@@ -603,11 +613,16 @@ class App {
 	}
 
 	updateDragging(position) {
-		const { drag, shield } = this.state;
+		const { state } = this;
+		const { drag, shield } = state;
 		if (!drag.active) return;
 		const deltaY = position.y - drag.startPosition.y;
 		shield.position.y = drag.startShieldPosition.y + deltaY;
 		shield.position.y = Math.min(Math.max(0, shield.position.y), config.height);
+
+		if (deltaY != 0) {
+			state.showHelpHud = false;
+		}
 	}
 
 	stopDragging() {
@@ -741,6 +756,7 @@ class App {
 		this.dom["fullscreen-btn"].style.display = 'block';
 		this.restartGameAfterHit();
 		this.startCountDown();
+		this.startHelpHud();
 
 		// Poutine fires
 		(async () => {
@@ -918,31 +934,12 @@ class App {
 		state.isPutinAsleep = false;
 	}
 
-	async playHeartBreakAnimation() {
+	async startHelpHud() {
 		const { state } = this;
-
-		state.lastLifeSkin = "heartBroken01";
-		await wait(50);
-		state.lastLifeSkin = "heartBroken02";
-		await wait(50);
-		state.lastLifeSkin = "heartBroken03";
-		await wait(50);
-
-		state.lastLifeSkin = "heart";
-		state.lives -= 1;
-	}
-
-	async playCharacterInvicible() {
-		const { state } = this;
-		const { character } = state;
-		state.isInvicible = true;
-		for (let i = 0 ; i < config.anim.invicible.iterations ; ++i) {
-			character.skin = "characterHighlight";
-			await wait(config.anim.invicible.period / 2);
-			character.skin = "character";
-			await wait(config.anim.invicible.period / 2);
-		}
-		state.isInvicible = false;
+		state.showHelpHudStartTime = performance.now();
+		state.showHelpHud = true;
+		await wait(config.anim.helpHud.duration);
+		state.showHelpHud = false;
 	}
 
 	startGameOver() {
@@ -1214,6 +1211,12 @@ class App {
 			ctx.clip();
 			ctx.drawImage(images.gaugeFull, 0, 0);
 			ctx.restore();
+
+			// Help HUD
+			if (state.showHelpHud && (performance.now() - state.showHelpHudStartTime) / config.anim.helpHud.blinkDuration % 1.0 < 0.5) {
+				ctx.drawImage(images.arrowUp, shield.position.x - images.arrowUp.width / 4, shield.position.y - images.shield.height / 2 - images.arrowUp.height / 2 - 10);
+				ctx.drawImage(images.arrowDown, shield.position.x - images.arrowDown.width / 4, shield.position.y + images.shield.height / 2 - images.arrowDown.height / 2 + 10);
+			}
 			break;
 
 		case 'END':
