@@ -361,6 +361,9 @@ class App {
 			{ name: "debris03", background: [255, 174, 201] },
 			{ name: "arrowUp", background: [255, 174, 201] },
 			{ name: "arrowDown", background: [255, 174, 201] },
+			{ name: "1", background: [255, 174, 201] },
+			{ name: "2", background: [255, 174, 201] },
+			{ name: "3", background: [255, 174, 201] },
 
 			{ name: "play", background: [255, 174, 201] },
 			{ name: "playHover", background: [255, 174, 201] },
@@ -763,7 +766,7 @@ class App {
 			const { start, wait: range } = config.anim.putinFires;
 			await wait(start);
 			while (state.scene == 'GAME') {
-				if (!state.isPutinAsleep) {
+				if (!state.isPutinAsleep && state.countDown == 0) {
 					this.triggerPoutineFire();
 				}
 				await wait(lerp(range.min, range.max, Math.random()));
@@ -793,26 +796,20 @@ class App {
 		this.dom["back-btn"].style.display = 'none';
 	}
 
-	startCountDown() {
+	async startCountDown() {
 		const { state } = this;
 		state.countDown = 3;
 		state.needRedraw = true;
 
-		wait(config.countDownDelay)
-		.then(() => {
-			state.countDown = 2;
-			state.needRedraw = true;
-			return wait(config.countDownDelay);
-		})
-		.then(() => {
-			state.countDown = 1;
-			state.needRedraw = true;
-			return wait(config.countDownDelay);
-		})
-		.then(() => {
-			state.countDown = 0;
-			state.needRedraw = true;
-		});
+		await wait(config.countDownDelay);
+		state.countDown = 2;
+		state.needRedraw = true;
+		await wait(config.countDownDelay);
+		state.countDown = 1;
+		state.needRedraw = true;
+		await wait(config.countDownDelay);
+		state.countDown = 0;
+		state.needRedraw = true;
 	}
 
 	triggerPoutineFire() {
@@ -1216,6 +1213,12 @@ class App {
 			if (state.showHelpHud && (performance.now() - state.showHelpHudStartTime) / config.anim.helpHud.blinkDuration % 1.0 < 0.5) {
 				ctx.drawImage(images.arrowUp, shield.position.x - images.arrowUp.width / 4, shield.position.y - images.shield.height / 2 - images.arrowUp.height / 2 - 10);
 				ctx.drawImage(images.arrowDown, shield.position.x - images.arrowDown.width / 4, shield.position.y + images.shield.height / 2 - images.arrowDown.height / 2 + 10);
+			}
+
+			// Countdown
+			if (state.countDown > 0) {
+				const img = images[state.countDown];
+				ctx.drawImage(img, (config.width - img.width) / 2, (config.height - img.height) / 2);
 			}
 			break;
 
