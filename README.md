@@ -9,6 +9,7 @@ Explorez les différents dossier pour y découvrir tous ces jeux/jouets !
 
  - **001** [Robert](https://eliemichel.github.io/JeuDePresse/Robert) *11 février 2024* [[lien alternatif]](https://www.exppad.com/games/JeuDePresse/Robert) [[source]](https://github.com/eliemichel/JeuDePresse/tree/main/Robert)
  - **002** [Alexeï](https://eliemichel.github.io/JeuDePresse/Alexei) *19 février 2024* [[lien alternatif]](https://www.exppad.com/games/JeuDePresse/Alexei) [[source]](https://github.com/eliemichel/JeuDePresse/tree/main/Alexei)
+ - **003** [Eiffel](https://eliemichel.github.io/JeuDePresse/Eiffel) *19 février 2024* [[lien alternatif]](https://www.exppad.com/games/JeuDePresse/Eiffel) [[source]](https://github.com/eliemichel/JeuDePresse/tree/main/Eiffel)
 
 **NB** *Le lien alternatif est moins mis mis à jour, mais est utile lorsque le lien principal est trop lent.*
 
