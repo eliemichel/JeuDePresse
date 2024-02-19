@@ -5,7 +5,7 @@ const config = {
 	pixelPerfect: false, // display in the exact 380x720 resolution, whichever the window size and pixel density
 	aboutUrl: "https://eliemichel.github.io/JeuDePresse/Eiffel/about",
 
-	drawingWidth: 40,
+	drawingWidth: 70,
 	checkVictoryDelay: 500,
 
 	initialBrushPosition: {
@@ -195,6 +195,9 @@ class App {
 			{ name: "projecteurs", background: [255, 255, 255], fill: [255, 201, 14] /* gold */ },
 			{ name: "brosse", background: [255, 174, 201] },
 			{ name: "victoire", background: [255, 174, 201] },
+
+			{ name: "fullscreen", background: [255, 174, 201] },
+			{ name: "fullscreenHover", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(async entry => {
@@ -500,6 +503,10 @@ class App {
 			});
 		}
 
+		autoSetupButton("fullscreen", {
+			top: 0,
+			right: 0
+		});
 		/*
 		autoSetupButton("play", {
 			top: 240,
@@ -513,11 +520,8 @@ class App {
 			bottom: 0,
 			left: 0
 		});
-		autoSetupButton("fullscreen", {
-			top: 0,
-			left: 0
-		});
 		*/
+		this.dom["fullscreen-btn"].style.opacity = 0.6;
 
 		this.setScene(config.startScene);
 		requestAnimationFrame(this.onFrame.bind(this));
