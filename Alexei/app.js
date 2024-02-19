@@ -1249,7 +1249,7 @@ class App {
 				const img = images.inmemoriam;
 				ctx.drawImage(img, (config.width - img.width) / 2, 0);
 				const img2 = images.continuons;
-				ctx.drawImage(img2, (config.width - img2.width) / 2, 195);
+				ctx.drawImage(img2, (config.width - img2.width) / 2, 190);
 			} else {
 				ctx.drawImage(images.gameover, 0, -50);
 				const img = images[state.poutineSkin];
