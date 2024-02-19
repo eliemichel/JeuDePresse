@@ -863,7 +863,9 @@ class App {
 			this.startVictory();
 		}
 
-		this.playSound(`manPainSilly${Math.floor(Math.random() * 23) + 1}`);
+		this.playSound(`manPainSilly${(
+			Math.floor(Math.random() * 23) + 1 + "").padStart(2, "0")}`
+		);
 
 		state.isPutinAsleep = true;
 		state.putinSleepStarted = performance.now();
