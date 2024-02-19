@@ -283,6 +283,7 @@ class App {
 	constructor() {
 		this.state = {
 			needRedraw: true,
+			audioContextAllowed: false,
 			scene: 'MENU', // of [ 'MENU', 'GAME', 'END' ]
 			victory: config.initialVictory,
 			corruption: config.startCorruption,
@@ -382,6 +383,10 @@ class App {
 			{ name: "backPressed", background: [255, 174, 201] },
 			{ name: "fullscreen", background: [255, 174, 201] },
 			{ name: "fullscreenHover", background: [255, 174, 201] },
+			{ name: "soundOn", background: [255, 174, 201] },
+			{ name: "soundOnHover", background: [255, 174, 201] },
+			{ name: "soundOff", background: [255, 174, 201] },
+			{ name: "soundOffHover", background: [255, 174, 201] },
 		]
 		return Promise.all(
 			imageInfo.map(entry => fetchImage(`images/${entry.name}.png`))
@@ -397,7 +402,7 @@ class App {
 	}
 
 	loadAudio() {
-		const { assets } = this;
+		const { assets, state } = this;
 		const soundInfo = [
 			...Array.from({length: 7}, (_, i) => ({ name: `bagCoins0${i + 1}` , type: "mp3"})),
 			...Array.from({length: 6}, (_, i) => ({ name: `womanFallQuick0${i + 1}` , type: "mp3"})),
@@ -408,6 +413,7 @@ class App {
 		]
 
 		const audioCtx = new AudioContext();
+		audioCtx.suspend();
 		this.audio.context = audioCtx;
 
 		// Create mixers for each sound group
@@ -436,6 +442,25 @@ class App {
 		);
 	}
 
+	// If only there was a browser event we could listen for when navigator.userActivation.hasBeenActive changes...
+	tryAllowingAudioContext() {
+		const { state, audio } = this;
+		if (!state.audioContextAllowed) {
+			audio.context.resume().then(() => {
+				state.audioContextAllowed = true;
+				this.onAudioContextAllowed();
+			});
+		}
+	}
+
+	onAudioContextAllowed() {
+		this.dom["soundOn-btn"].style.display = 'block';
+		this.dom["soundOff-btn"].style.display = 'none';
+		if (this.state.scene == 'MENU') {
+			this.fadeInMenuMusic();
+		}
+	}
+
 	onDomContentLoaded() {
 		const elementNames = [
 			"main",
@@ -450,6 +475,10 @@ class App {
 			"E-btn-img",
 			"fullscreen-btn",
 			"fullscreen-btn-img",
+			"soundOn-btn",
+			"soundOn-btn-img",
+			"soundOff-btn",
+			"soundOff-btn-img",
 			"about",
 			"menu-music-audio",
 		];
@@ -479,6 +508,19 @@ class App {
 			window.open(config.aboutUrl, '_blank');
 		});
 
+		this.dom["soundOn-btn"].addEventListener("click", e => {
+			this.dom["soundOff-btn"].style.display = 'block';
+			this.dom["soundOn-btn"].style.display = 'none';
+			this.turnSound(false);
+		});
+
+		this.dom["soundOff-btn"].addEventListener("click", e => {
+			this.dom["soundOn-btn"].style.display = 'block';
+			this.dom["soundOff-btn"].style.display = 'none';
+			this.turnSound(true);
+			
+		});
+
 		this.dom["fullscreen-btn"].addEventListener("click", e => {
 			if (document.fullscreenElement) {
 				screen.orientation.unlock();
@@ -486,9 +528,6 @@ class App {
 			} else {
 				this.dom.container.requestFullscreen();
 				screen.orientation.lock('landscape').catch(err => console.log(`Could not lock landscape mode.`));
-				if (this.state.scene == 'MENU') {
-					this.fadeInMenuMusic();
-				}
 			}
 		});
 
@@ -502,16 +541,24 @@ class App {
 		track.connect(menuMusicMixer).connect(audioCtx.destination);
 		this.audio.mixers.menuMusic = menuMusicMixer;
 
-		document.addEventListener("keydown", this.onKeyDown.bind(this));
-		document.addEventListener("keyup", this.onKeyUp.bind(this));
-		document.addEventListener("touchstart", this.onTouchStart.bind(this));
-		document.addEventListener("touchend", this.onTouchEnd.bind(this));
-		document.addEventListener("touchmove", this.onTouchMove.bind(this));
-		document.addEventListener("touchcancel", this.onTouchCancel.bind(this));
-		document.addEventListener("mousedown", this.onMouseDown.bind(this));
-		document.addEventListener("mouseup", this.onMouseUp.bind(this));
-		document.addEventListener("mousemove", this.onMouseMove.bind(this));
-		document.addEventListener("mouseenter", this.onMouseEnter.bind(this));
+		const eventHandlers = [
+			[ 'keydown', this.onKeyDown ],
+			[ 'keyup', this.onKeyUp ],
+			[ 'touchstart', this.onTouchStart ],
+			[ 'touchend', this.onTouchEnd ],
+			[ 'touchmove', this.onTouchMove ],
+			[ 'touchcancel', this.onTouchCancel ],
+			[ 'mousedown', this.onMouseDown ],
+			[ 'mouseup', this.onMouseUp ],
+			[ 'mousemove', this.onMouseMove ],
+			[ 'mouseenter', this.onMouseEnter ],
+		];
+		for (const [eventName, handler] of eventHandlers) {
+			document.addEventListener(eventName, ev => {
+				this.tryAllowingAudioContext();
+				handler.bind(this)(ev);
+			});
+		}
 		new ResizeObserver(this.onResize.bind(this)).observe(this.dom.container);
 		this.onResize();
 	}
@@ -667,6 +714,14 @@ class App {
 			top: 0,
 			right: 0
 		});
+		autoSetupButton("soundOn", {
+			top: 0,
+			right: images.fullscreen.width,
+		});
+		autoSetupButton("soundOff", {
+			top: 0,
+			right: images.fullscreen.width,
+		});
 		autoSetupButton("play", {
 			top: 40,
 			right: 60
@@ -682,6 +737,9 @@ class App {
 		});
 		this.dom[`fullscreen-btn-img`].style.opacity = this.dom.canvas.requestFullscreen ? 0.5 : 0.0;
 		*/
+
+		this.dom["fullscreen-btn"].style.display = 'block';
+		this.dom["soundOff-btn"].style.display = 'block';
 
 		// Play button animation
 		const playButtonAnimation = async () => {
@@ -707,7 +765,6 @@ class App {
 		this.dom["play-btn"].style.display = 'block';
 		this.dom["about-btn"].style.display = 'block';
 		this.dom["E-btn"].style.display = 'block';
-		this.dom["fullscreen-btn"].style.display = 'block';
 		this.fadeInMenuMusic();
 	}
 
@@ -715,10 +772,10 @@ class App {
 		this.dom["play-btn"].style.display = 'none';
 		this.dom["about-btn"].style.display = 'none';
 		this.dom["E-btn"].style.display = 'none';
-		this.dom["fullscreen-btn"].style.display = 'none';
 	}
 
 	async fadeInMenuMusic() {
+		if (!this.state.audioContextAllowed) return;
 		const { menuMusic } = this.audio.mixers;
 		const sound = this.dom["menu-music-audio"];
 
@@ -761,7 +818,6 @@ class App {
 
 	startGame() {
 		const { state } = this;
-		this.dom["fullscreen-btn"].style.display = 'block';
 		this.restartGameAfterHit();
 		this.startCountDown();
 		this.startHelpHud();
@@ -790,7 +846,6 @@ class App {
 	}
 
 	stopGame() {
-		this.dom["fullscreen-btn"].style.display = 'none';
 	}
 
 	startEnd() {
@@ -1138,6 +1193,8 @@ class App {
 
 	playSound(soundName, loop) {
 		const audioCtx = this.audio.context;
+		if (audioCtx.state != 'running') return;
+
 		const source = audioCtx.createBufferSource();
 		source.buffer = this.assets.sounds[soundName];
 		if (soundName.includes("womanFallQuick")) {
@@ -1150,6 +1207,15 @@ class App {
 		}
 		source.loop = !!loop;
 		source.start();
+	}
+
+	turnSound(on) {
+		const audioCtx = this.audio.context;
+		if (on) {
+			audioCtx.resume();
+		} else {
+			audioCtx.suspend();
+		}
 	}
 
 	draw() {
