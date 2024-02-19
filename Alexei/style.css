@@ -2,6 +2,7 @@ body {
 	margin: 0;
 	padding: 0;
 	background-color: black;
+	overflow: hidden;
 }
 
 main {
@@ -36,9 +37,10 @@ canvas,
 
 #about {
 	position: absolute;
-	left: 100%;
-	padding-top: 3.0rem;
-	padding-left: 1.0rem;
+	top: 100%;
+	padding: 1.0rem;
+	overflow-y: auto;
+	box-sizing: border-box;
 
 	color: #d2d2d2;
 	font-size: 1.1rem;

@@ -588,9 +588,9 @@ class App {
 		this.dom.main.style.top = `${(window.innerHeight - height) / 2}px`;
 		this.dom.main.style['font-size'] = `${width / (config.width * config.domPixelMultiplier)}px`; // scale definition of '1em'
 
-		const remainingWidth = window.innerWidth - width;
-		this.dom.about.style.width = `${Math.min(remainingWidth / 2, config.width) - 20}px`;
-		this.dom.about.style.display = remainingWidth > 400 && document.fullscreenElement == null ? 'block' : 'none';
+		const remainingHeight = window.innerHeight - height;
+		this.dom.about.style.height = `${remainingHeight / 2}px`;
+		this.dom.about.style.display = remainingHeight > 400 && document.fullscreenElement == null ? 'block' : 'none';
 	}
 
 	onKeyDown(ev) {
