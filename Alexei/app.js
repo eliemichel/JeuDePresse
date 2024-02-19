@@ -691,7 +691,7 @@ class App {
 		}
 	}
 
-	async fadeOutMenuMusic() {
+	async fadeOutMenuMusic() {  // NOTE not used in current game
 		const { menuMusic } = this.audio.mixers;
 		const sound = this.dom["menu-music-audio"];
 
@@ -703,7 +703,13 @@ class App {
 	}
 
 	startTransitionToGame() {
-		this.fadeOutMenuMusic();
+		// Test menu music is playing
+		const sound = this.dom["menu-music-audio"];
+		if (sound.paused) {
+			this.fadeInMenuMusic();
+		}
+
+		
 		this.dom["play-btn"].style.display = 'none';
 		this.dom["about-btn"].style.display = 'none';
 		this.state.transitionToGameStartTime = performance.now();
