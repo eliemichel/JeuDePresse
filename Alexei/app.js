@@ -82,8 +82,8 @@ const config = {
 
 	// == DEBUG ==
 	//countDownDelay: 100,
-	startScene: 'END',
-	initialVictory: true,
+	//startScene: 'END',
+	//initialVictory: true,
 	//defaultLives: 10,
 	//difficultyIncrementTime: 5000,
 	// ==  ==
