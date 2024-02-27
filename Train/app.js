@@ -5,7 +5,7 @@ const config = {
 	pixelPerfect: false,
 	width: 720,
 	height: 380,
-	startScene: 'GAME',
+	startScene: 'MENU',
 
 	loadBar: {
 		width: 200,
@@ -34,7 +34,14 @@ const config = {
 			scale: 0.5,
 			offset: { y: 30 },
 		},
-	}
+	},
+
+	anim: {
+		transitionToGame: {
+			duration: 200,
+			speed: 800,
+		},
+	},
 };
 
 // Use this any time you set the size/position of a DOM element
@@ -82,6 +89,8 @@ class App {
 			},
 
 			fx: [],
+
+			transitionToGameStartTime: null,
 		};
 		this.assets = {
 			images: {},
@@ -126,6 +135,18 @@ class App {
 		const imageInfo = [
 			//{ name: "shield", background: [255, 174, 201], computeContentBBox: true },
 			{ name: "train", background: [200, 191, 231] },
+			{ name: "title", background: [0, 0, 0] },
+
+			{ name: "fullscreen", background: [255, 174, 201] },
+			{ name: "fullscreenHover", background: [255, 174, 201] },
+			{ name: "soundOn", background: [255, 174, 201] },
+			{ name: "soundOnHover", background: [255, 174, 201] },
+			{ name: "soundOff", background: [255, 174, 201] },
+			{ name: "soundOffHover", background: [255, 174, 201] },
+			{ name: "play", background: [255, 174, 201] },
+			{ name: "playHover", background: [255, 174, 201] },
+			{ name: "playPressed", background: [255, 174, 201] },
+			{ name: "playHighlight", background: [255, 174, 201] },
 		];
 
 		state.loading.total += imageInfo.length;
@@ -463,7 +484,7 @@ class App {
 	start() {
 		const { images, sounds } = this.assets;
 		const autoSetupButton = (name, placement) => {
-			setupButton({
+			lib.setupButton(config, {
 				buttonElement: this.dom[`${name}-btn`],
 				imageElement: this.dom[`${name}-btn-img`],
 				images: {
@@ -475,11 +496,6 @@ class App {
 			});
 		}
 
-		/*
-		autoSetupButton("back", {
-			top: 0,
-			left: 0
-		});
 		autoSetupButton("fullscreen", {
 			top: 0,
 			right: 0
@@ -493,8 +509,13 @@ class App {
 			right: images.fullscreen.width,
 		});
 		autoSetupButton("play", {
-			top: 40,
-			right: 60
+			top: 70,
+			right: 80
+		});
+		/*
+		autoSetupButton("back", {
+			top: 0,
+			left: 0
 		});
 		autoSetupButton("about", {
 			top: 100,
@@ -505,7 +526,7 @@ class App {
 			left: 0
 		});
 		this.dom[`fullscreen-btn-img`].style.opacity = this.dom.canvas.requestFullscreen ? 0.5 : 0.0;
-		
+		*/
 
 		this.dom["fullscreen-btn"].style.display = 'block';
 		this.dom["soundOff-btn"].style.display = 'block';
@@ -514,17 +535,16 @@ class App {
 		const playButtonAnimation = async () => {
 			const element = this.dom["play-btn-img"];
 			if (element.dataset.hover != "true" && element.dataset.pressed != "true") {
-				setButtonImage(element, this.assets.images.playHighlight);
+				lib.setButtonImage(config, element, this.assets.images.playHighlight);
 			}
 			await wait(500);
 			if (element.dataset.hover != "true" && element.dataset.pressed != "true") {
-				setButtonImage(element, this.assets.images.play);
+				lib.setButtonImage(config, element, this.assets.images.play);
 			}
 			await wait(500);
 			playButtonAnimation();
 		}
 		playButtonAnimation();
-		*/
 
 		this.setScene(config.startScene);
 		requestAnimationFrame(this.onFrame.bind(this));
@@ -536,6 +556,7 @@ class App {
 		this.dom["about-btn"].style.display = 'block';
 		this.dom["E-btn"].style.display = 'block';
 		this.fadeInMenuMusic();
+		this.resetTerrain();
 	}
 
 	stopMenu() {
@@ -573,10 +594,10 @@ class App {
 
 	startTransitionToGame() {
 		// Test menu music is playing
-		const sound = this.dom["menu-music-audio"];
-		if (sound.paused) {
-			this.fadeInMenuMusic();
-		}
+		//const sound = this.dom["menu-music-audio"];
+		//if (sound.paused) {
+		//	this.fadeInMenuMusic();
+		//}
 
 		
 		this.dom["play-btn"].style.display = 'none';
@@ -588,7 +609,7 @@ class App {
 		})
 	}
 
-	startGame() {
+	resetTerrain() {
 		// Initialize elevation
 		const { state } = this;
 		const { terrain } = state;
@@ -619,6 +640,9 @@ class App {
 			x += point.dx;
 			point.x = x;
 		}
+	}
+
+	startGame() {
 	}
 
 	ensureElevationUntil(targetX) {
@@ -930,9 +954,7 @@ class App {
 
 		switch (scene) {
 
-		case 'MENU':
-			break;
-
+		case 'MENU': // pass through
 		case 'GAME':
 			const t = performance.now() / 1000.0;
 
@@ -995,6 +1017,19 @@ class App {
 				}
 
 				ctx.restore();
+			}
+
+			if (scene == 'MENU') {
+				const positions = {
+					title: 0,
+				};
+				if (this.state.transitionToGameStartTime != null) {
+					const time = (performance.now() - this.state.transitionToGameStartTime) / 1000.0;
+					const { speed } = config.anim.transitionToGame;
+					positions.title = Math.max(time, 0.0) * speed;
+				}
+
+				ctx.drawImage(images.title, 0, positions.title);
 			}
 			break;
 

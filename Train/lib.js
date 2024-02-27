@@ -133,13 +133,13 @@ export function isOpaqueAt(canvas, position) {
 	return canvas.getContext("2d").getImageData(x, y, 1, 1).data[3] > 0
 }
 
-export function setButtonImage(element, image) {
+export function setButtonImage(config, element, image) {
 	element.src = image.toDataURL();
 	element.style.width = `${image.width * config.domPixelMultiplier}em`;
 	element.style.height = `${image.height * config.domPixelMultiplier}em`;	
 }
 
-export function setupButton(args) {
+export function setupButton(config, args) {
 	const {
 		buttonElement,
 		imageElement,
@@ -147,28 +147,28 @@ export function setupButton(args) {
 		placement
 	} = args;
 
-	setButtonImage(imageElement, images.default);
+	setButtonImage(config, imageElement, images.default);
 	imageElement.dataset.hover = false;
 	imageElement.dataset.pressed = false;
 	
 	if (images.hover) {
 		buttonElement.addEventListener("mouseenter", e => {
-			setButtonImage(imageElement, images.hover);
+			setButtonImage(config, imageElement, images.hover);
 			imageElement.dataset.hover = true;
 		});
 		buttonElement.addEventListener("mouseleave", e => {
-			setButtonImage(imageElement, images.default);
+			setButtonImage(config, imageElement, images.default);
 			imageElement.dataset.hover = false;
 		});
 	}
 	
 	if (images.pressed) {
 		buttonElement.addEventListener("mousedown", e => {
-			setButtonImage(imageElement, images.pressed);
+			setButtonImage(config, imageElement, images.pressed);
 			imageElement.dataset.pressed = true;
 		});
 		buttonElement.addEventListener("mouseup", e => {
-			setButtonImage(imageElement, images.default);
+			setButtonImage(config, imageElement, images.default);
 			imageElement.dataset.pressed = true;
 		});
 	}
