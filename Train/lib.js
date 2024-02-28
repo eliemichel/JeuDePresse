@@ -199,7 +199,7 @@ export function drawSprite(ctx, image, x, y, angle, options) {
 	ctx.restore();
 }
 
-class PseudoRandomGenerator {
+export class PseudoRandomGenerator {
 	constructor(seed) {
 		this.value = seed;
 	}

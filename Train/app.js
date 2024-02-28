@@ -42,6 +42,22 @@ const config = {
 			speed: 800,
 		},
 	},
+
+	digits: {
+		width: 8*3,
+		height: 8*4,
+		padding: 2,
+		variants: 2,
+		margin: -6,
+	},
+
+	delayBeforeClickEnabled: 500,
+	startRockCount: 3,
+	rockVelocityStrength: 0.3,
+
+	// DEBUG
+	startRockCount: 30,
+	//gravity: 0,
 };
 
 // Use this any time you set the size/position of a DOM element
@@ -54,6 +70,7 @@ class App {
 			audioContextAllowed: false,
 			loading: { done: 0, total: 0 },
 			scene: config.startScene,
+			startTime: null,
 			previousFrameTime: performance.now(),
 
 			camera: {
@@ -86,6 +103,11 @@ class App {
 				elevation: [],
 				landscapeElevation: [],
 				lastClear: performance.now() / 1000.0,
+			},
+
+			rocks: {
+				count: config.startRockCount,
+				items: [],
 			},
 
 			fx: [],
@@ -147,6 +169,12 @@ class App {
 			{ name: "playHover", background: [255, 174, 201] },
 			{ name: "playPressed", background: [255, 174, 201] },
 			{ name: "playHighlight", background: [255, 174, 201] },
+
+			{ name: "rock", background: [255, 174, 201] },
+			{ name: "hudFrame", background: [255, 174, 201] },
+			{ name: "numberBackground", background: [255, 174, 201] },
+			{ name: "digits", background: [255, 174, 201] },
+			{ name: "dot", background: [255, 174, 201] },
 		];
 
 		state.loading.total += imageInfo.length;
@@ -312,6 +340,7 @@ class App {
 			[ 'mouseup', this.onMouseUp ],
 			[ 'mousemove', this.onMouseMove ],
 			[ 'mouseenter', this.onMouseEnter ],
+			[ 'click', this.onClick ],
 		];
 		for (const [eventName, handler] of eventHandlers) {
 			document.addEventListener(eventName, ev => {
@@ -384,6 +413,29 @@ class App {
 
 	// Called by stopDragging
 	onClick(ev) {
+		if (this.state.scene == 'GAME') {
+			const mouse = { x: ev.clientX, y: ev.clientY };
+			this.addRock(this.mouseToScenePosition(mouse));
+		}
+	}
+
+	addRock(position) {
+		const { state } = this;
+		const { fx, rocks } = state;
+
+		const t = performance.now();
+
+		if (rocks.count <= 0 || t - state.startTime < config.delayBeforeClickEnabled) {
+			return;
+		}
+		--rocks.count;
+
+		rocks.items.push({
+			x: position.x,
+			y: position.y,
+			angle: Math.random() * 360,
+			isDestroyed: false,
+		});
 	}
 
 	mouseToScenePosition(mouse) {
@@ -392,7 +444,7 @@ class App {
 		const rect = this.dom.canvas.getBoundingClientRect();
 		return {
 			x: (x - rect.x) * (config.width / rect.width) - camera.smoothPosition.x,
-			y: (y - rect.y) * (config.height / rect.height) - camera.smoothPosition.y,
+			y: config.height - ( (y - rect.y) * (config.height / rect.height) - camera.smoothPosition.y ),
 		};
 	}
 
@@ -409,7 +461,7 @@ class App {
 	onMouseUp(ev) {
 		if (ev.button == 0) {
 			if (!this.stopDragging()) {
-				this.onClick(ev);
+				//this.onClick(ev);
 			}
 		}
 	}
@@ -426,7 +478,7 @@ class App {
 
 	onTouchEnd(ev) {
 		if (!this.stopDragging()) {
-			this.onClick(ev);
+			//this.onClick(ev);
 		}
 	}
 
@@ -643,6 +695,7 @@ class App {
 	}
 
 	startGame() {
+		this.state.startTime = performance.now();
 	}
 
 	ensureElevationUntil(targetX) {
@@ -776,13 +829,21 @@ class App {
 
 	updateGame(dt) {
 		const { state, assets } = this;
-		const { camera, target, train, terrain } = state;
+		const { camera, target, train, terrain, rocks } = state;
+		const t = performance.now() / 1000.0;
 
 		camera.position.x = 50 - train.position.x;
 		camera.position.y = -270 + train.position.y;
 
 		camera.smoothPosition.x = lib.lerp(camera.position.x, camera.smoothPosition.x, config.camera.smoothness);
 		camera.smoothPosition.y = lib.lerp(camera.position.y, camera.smoothPosition.y, config.camera.smoothness);
+
+		// Terrain generation		
+		this.ensureElevationUntil(-camera.smoothPosition.x + config.width);
+		if (t - terrain.lastClear > config.terrain.clearPeriod) {
+			this.clearElevationUntil(-camera.smoothPosition.x - config.width / 2);
+			terrain.lastClear = t;
+		}
 
 		// Train dynamics
 		train.position.x += train.velocity.x * dt;
@@ -831,14 +892,43 @@ class App {
 			}
 		}
 
+		// Collisions
+		const frontBottom = {
+			x: train.position.x + c * 50 - s * 5,
+			y: train.position.y + s * 50 + c * 5,
+		};
+		const frontTop = {
+			x: train.position.x + c * 52 - s * 25,
+			y: train.position.y + s * 52 + c * 25,
+		};
+
+		function isRockAt(rock, worldPosition) {
+			const dx = worldPosition.x - rock.x;
+			const dy = -(worldPosition.y - rock.y);
+			const c = Math.cos(-rock.angle * Math.PI / 180);
+			const s = Math.sin(-rock.angle * Math.PI / 180);
+			const rockPosition = {
+				x: c * dx - s * dy + assets.images.rock.width / 2,
+				y: s * dx + c * dy + assets.images.rock.height / 2,
+			};
+			return lib.isOpaqueAt(assets.images.rock, rockPosition);
+		}
+		
+		for (const rock of rocks.items) {
+			const topHits = isRockAt(rock, frontTop);
+			const bottomHits = isRockAt(rock, frontBottom);
+			if (topHits || bottomHits) {
+				train.velocity.x = Math.max(train.velocity.x - config.rockVelocityStrength, 0);
+				rock.isDestroyed = true;
+			}
+		}
+
+
+		rocks.items = rocks.items.filter(r => !r.isDestroyed && r.x > -camera.smoothPosition.x - 200);
+
 		state.fx = state.fx.filter(fx => !fx.isDestroyed);
 		state.fx.push({
 			draw: ctx => {
-				//ctx.strokeStyle = "rgb(0, 255, 0)";
-				//ctx.beginPath();
-				//ctx.moveTo(frontWheelsX, config.height - frontWheelsY);
-				//ctx.lineTo(frontWheelsX, config.height - frontWheelsY + 20);
-				//ctx.stroke();
 			},
 			isDestroyed: true, // takes effect next frame
 		});
@@ -943,6 +1033,37 @@ class App {
 		}
 	}
 
+	// digit is in {0, ..., 9}
+	drawDigit(ctx, digit, rand, x, y) {
+		const { images } = this.assets;
+		const { width, height, padding, variants, margin } = config.digits;
+		const variantIdx = Math.floor(rand.random() * variants);
+		ctx.drawImage(
+			images.digits,
+			digit * width + padding, variantIdx * height + padding, width - padding, height - padding,
+			x + margin, y, width - padding, height - padding
+		);
+		return x + width - padding + margin;
+	}
+
+	drawChar(ctx, charName, x, y) {
+		const { images } = this.assets;
+		ctx.drawImage(images[charName], x, y);
+		return x + images[charName].width;
+	}
+
+	drawNumber(ctx, number, x, y) {
+		let c = x;
+		let rand = new lib.PseudoRandomGenerator(Math.floor(number * 1000000));
+		for (const char of String(number)) {
+			if (char == ".") {
+				c = this.drawChar(ctx, "dot", c, y);
+			} else {
+				c = this.drawDigit(ctx, parseInt(char), rand, c, y);
+			}
+		}
+	}
+
 	draw() {
 		const { state } = this;
 		const { scene, camera, train, terrain } = state;
@@ -957,12 +1078,6 @@ class App {
 		case 'MENU': // pass through
 		case 'GAME':
 			const t = performance.now() / 1000.0;
-
-			this.ensureElevationUntil(-camera.smoothPosition.x + config.width);
-			if (t - terrain.lastClear > config.terrain.clearPeriod) {
-				this.clearElevationUntil(-camera.smoothPosition.x - config.width / 2);
-				terrain.lastClear = t;
-			}
 
 			{ // Background
 				ctx.save();
@@ -998,6 +1113,11 @@ class App {
 				ctx.lineTo(x, config.height - camera.smoothPosition.y);
 				ctx.fill();
 
+				for (const rock of state.rocks.items) {
+					const { x, y, angle } = rock;
+					lib.drawSprite(ctx, images.rock, x, config.height - y, angle);
+				}
+
 				lib.drawSprite(
 					ctx,
 					images.train,
@@ -1030,6 +1150,16 @@ class App {
 				}
 
 				ctx.drawImage(images.title, 0, positions.title);
+			} else {
+				// Hud
+				ctx.drawImage(images.hudFrame, 5, config.height - images.hudFrame.height - 5);
+				ctx.drawImage(images.rock, 5, config.height - images.hudFrame.height - 5);
+				lib.drawSprite(ctx, images.numberBackground, 5 + images.hudFrame.width, config.height - images.hudFrame.height);
+				if (state.rocks.count > 9) {
+					lib.drawSprite(ctx, images.numberBackground, 22 + images.hudFrame.width, config.height - images.hudFrame.height);
+				}
+
+				this.drawNumber(ctx, state.rocks.count, images.hudFrame.width, config.height - images.hudFrame.height - 14);
 			}
 			break;
 
